@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<iso_project
+	image_name="buildp/cfacp.bin"
+	cue_sheet="buildp/cfacp.cue"
+>
+	<track type="data">
+		<identifiers
+			system			="PLAYSTATION"
+			volume			="PSN00BSDK"
+			volume_set		="PSN00BSDK"
+			publisher		="MEIDOTEK"
+			data_preparer	="PSN00BSDK BUILD SCRIPT"
+			application		="PLAYSTATION"
+			copyright		="README.TXT;1"
+		/>
+
+		<directory_tree>
+			<file name="SYSTEM.CNF"		type="data" source="system-pal.cnf" />
+			<file name="CFACP.EXE"	type="data" source="buildp/cfacp.exe" />
+			<file name="README.TXT"	type="data" source="readme.md" />
+			<file name="CFACP.MAP"	type="data" source="buildp/cfacp.elf.map" />
+
+			<dummy sectors="1024"/>
+		</directory_tree>
+	</track>
+
+	<!-- <track type="audio" source="glul.wav" /> -->
+</iso_project>
