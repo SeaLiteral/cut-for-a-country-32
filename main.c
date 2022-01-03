@@ -47,17 +47,35 @@ const int Video_Mode = MODE_NTSC;
 
 #define OTLENGTH 32768 // Size of the ordering table
 
+#define RANDOM_STATE_SIZE 7
+int pseudoRandomState[RANDOM_STATE_SIZE]={3141592, 65358979, 32384626, 43383279, 50288419, 71693993, 75105820};
+uint16_t pseudoRandomStep=0;
+
 // functions
 void initDisplay();
-void showDisplay();
+void swapBuffers();
 void loadFont();
 void getInput(uint16_t button_input, uint16_t player_id);
-void getCommonInput(uint16_t button_input);
+void getResultScreenInput(uint16_t button_input);
 void drawPlayer(int playerNum);
 void drawHealth();
 void handleHits();
-void drawText(unsigned char *text);
+void setPlayer1Frame(int f);
+void drawText(unsigned char *text, int textY);
 int main();
+
+enum Game_Modes { // remember to adjust the count
+    LANGUAGE_MENU,
+    MAIN_MENU,
+    CHARACTER_MENU,
+    SHOW_RESULT,
+    MENU_LEAVE_LANGUAGES,
+    MENU_LEAVE_MAIN,
+    FIGHT_MODE,
+} game_mode=FIGHT_MODE;
+# define AMOUNT_OF_GAME_MODES 9
+int exit_from_mode[AMOUNT_OF_GAME_MODES];
+int amount_of_players=2;
 
 // graphics
 DISPENV dispenvs[2];
@@ -96,6 +114,9 @@ signed int player_1_dash_state=0;
 signed int player_2_dash_state=0;
 signed int player_1_punch_state=0;
 signed int player_2_punch_state=0;
+
+char ai_dodge=0;
+char ai_wait=0;
 // int player_1_block_state=0; // Just checking animation frame for now
 
 signed int player_1_health=PLAYER_MAX_HEALTH;
@@ -110,37 +131,103 @@ u_char controller_buffers[2][34];
 extern u_long font_texture_tim_data[];
 TIM_IMAGE font_texture;
 
+//                            0    5   10   15   20   25   30   35   40   45   50   55   60   65   70   75   80
+//                            0                 19                37            51    57               74
+unsigned char all_texts_da[]="$SPILLER 1 VANDT$  SPILLER 2 VANDT$  DET BLEV LIGE$DANSK$ENGLISH$ESPA~NOL$1 SPILLER$2 SPILLERE$ SPROG$  $";
+unsigned char all_texts_en[]="$PLAYER 1  WINS$   PLAYER 2 WINS$    PLAYERS TIED$ DANSK$ENGLISH$ESPA~NOL$1 PLAYER$ 2 PLAYERS$  LANGUAGE$";
+unsigned char all_texts_es[]="$GANA EL JUGADOR 1$GANA EL JUGADOR 2$EMPATE$       DANSK$ENGLISH$ESPA~NOL$1 JUGADOR$2 JUGADORES$IDIOMA$ $";
 
-//                           0                    20                   40           55
-unsigned char wintexts_da[]="SPILLER ET VANDT\0   SPILLER TO VANDT\0   DET BLEV LIGE\0";
-unsigned char wintexts_en[]="PLAYER ONE WINS\0    PLAYER TWO WINS\0    PLAYERS TIED\0 ";
-unsigned char wintexts_es[]="GANA EL JUGADOR UNO\0GANA EL JUGADOR dos\0EMPATE\0       ";
+#define EMPTY_STRING 0
+#define RESULT_ONE 1
+#define RESULT_TWO 19
+#define RESULT_TIE 37
+#define LANGUAGE_DA 51
+#define LANGUAGE_EN 57
+#define LANGUAGE_ES 65
+#define ONE_PLAYER 74
+#define TWO_PLAYERS 84
+#define LANGUAGE_OPTIONS 96
 
-#define RESULT_ONE 0
-#define RESULT_TWO 20
-#define RESULT_TIE 40
-#define RESULT_EMPTY 55
+unsigned char *language_text=all_texts_en;
 
-unsigned char *language_text=wintexts_en;
+unsigned char *language_pointers[]={all_texts_da, all_texts_en, all_texts_es};
+int current_language=1; // English
 
-unsigned char *language_pointers[]={wintexts_en, wintexts_da, wintexts_es};
-int current_language=0; // English
+int show_text=EMPTY_STRING;
+#define MENU_MAX_OPTIONS 4
+int menu_full[MENU_MAX_OPTIONS];
+int current_menu_options = 0;
+int current_menu_selection=0;
 
-unsigned char *show_text=wintexts_en+RESULT_EMPTY;
 
-int select_was_pressed = 0;
 
+int16_t select_was_pressed = 0;
+int16_t start_was_pressed = 0;
+int16_t down_was_pressed = 0;
+int16_t up_was_pressed = 0;
+int16_t left_was_pressed = 0;
+int16_t right_was_pressed = 0;
+int16_t cross_was_pressed = 0;
+int16_t circle_was_pressed = 0;
+int16_t square_was_pressed = 0;
+int16_t triangle_was_pressed = 0;
 
 // Positions of different letters on the spritesheet
 
                     //    A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
-signed char textCols[]={  5,  3,  1,  6,  7,  8,  9,  2,  2,  0,  5,  6,  4, 10,  5,  4,  6,  7,  8,  9,  7,  8,  0,  9, 10, -1};
-signed char textRows[]={ 12, 15, 16, 12, 12, 12, 12, 16, 44, 18, 23, 23,  0, 12,  0, 24,  0, 23, 23, 23,  0,  0,  0,  0,  0, -1};
-signed char textSizs[]={ 11, 10, 10, 11, 11, 11, 11, 10,  4, 10, 10, 10, 13, 11,  12, 9, 12, 10, 10, 10, 12, 12, 18, 12, 12, -1};
+signed char textCols[]={  5,  3,  1,  6,  7,  8,  9,  2,  2,  0,  5,  6,  4, 10,  5,  4,  6,  7,  8,  9,  7,  8,  0,  9, 10, 13, -1};
+signed char textRows[]={ 12, 15, 16, 12, 12, 12, 12, 16, 44, 18, 23, 23,  0, 12,  0, 24,  0, 23, 23, 23,  0,  0,  0,  0,  0, 4, -1};
+signed char textSizs[]={ 11, 10, 10, 11, 11, 11, 11, 10,  4, 10, 10, 10, 13, 11,  12, 9, 12, 10, 10, 10, 12, 12, 18, 12, 12, 11, -1};
+
+//                       0   1   2   3   4   5   6   7   8   9
+signed char numSizs[]={ 11,  6, 10,  9,  9, 10, 10,  7, 10,  9};
+signed char numRows[]={  0, 11, 17, 27, 36, 45, 55, 65, 72, 82};
 
 #include "player_1_xyc.h"
 #include "player_1_animations.h"
 
+void initModes(){
+    exit_from_mode[LANGUAGE_MENU]=MENU_LEAVE_LANGUAGES;
+    exit_from_mode[MAIN_MENU] = MENU_LEAVE_MAIN;
+    exit_from_mode[CHARACTER_MENU]=FIGHT_MODE;
+    exit_from_mode[FIGHT_MODE]=SHOW_RESULT;
+    exit_from_mode[SHOW_RESULT]=FIGHT_MODE;
+    exit_from_mode[MENU_LEAVE_LANGUAGES]=FIGHT_MODE;
+    exit_from_mode[MENU_LEAVE_MAIN]=FIGHT_MODE;
+}
+
+void initMenu(int selection){
+    current_menu_selection = selection;
+    current_menu_options=0;
+    for (int i=0;i<MENU_MAX_OPTIONS;i++){
+        menu_full[i] = EMPTY_STRING;
+    }
+}
+
+int addMenuOption(int string_id){
+   if (current_menu_options>=MENU_MAX_OPTIONS){
+       return 1;
+   }
+   menu_full[current_menu_options] = string_id;
+   current_menu_options++;
+   return 0;
+}
+
+void initLanguageMenu(){
+    initMenu(1);
+    addMenuOption (LANGUAGE_DA);
+    addMenuOption (LANGUAGE_EN);
+    addMenuOption (LANGUAGE_ES);
+    game_mode = LANGUAGE_MENU;
+}
+
+void initMainMenu(){
+    initMenu(amount_of_players-1);
+    addMenuOption (ONE_PLAYER);
+    addMenuOption (TWO_PLAYERS);
+    addMenuOption (LANGUAGE_OPTIONS);
+    game_mode = MAIN_MENU;
+}
 
 void setPlayer1Frame(int f){
     
@@ -184,7 +271,7 @@ void setPlayer1Frame(int f){
         player_1_tri_count = player_1_tri_count_slag_2;
         return;
     }
-    if (f==4){
+    if (f==4 || f==5){
         player1verts_x = player1verts_x_slag_3;
         player1verts_y = player1verts_y_slag_3;
         player_1_trirefs = player_1_trirefs_slag_3;
@@ -253,7 +340,7 @@ void initDisplay(){
     SetDefDrawEnv (&drawenvs[0], 0, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT); //bottom
     SetDefDrawEnv (&drawenvs[1], 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT); //top
     
-    SetVideoMode (Video_Mode);
+    //SetVideoMode (Video_Mode);
     
     setRGB0(&drawenvs[0], BACK_RED, BACK_GREEN, BACK_BLUE);  // Set clear color (dark purple)
     setRGB0(&drawenvs[1], BACK_RED, BACK_GREEN, BACK_BLUE);
@@ -266,7 +353,7 @@ void initDisplay(){
     loadFont();
 }
 
-void showDisplay() {
+void swapBuffers() {
     DrawSync(0);
     VSync(0);
 
@@ -385,47 +472,190 @@ void drawPlayer(int playerNum){
         }
 }
 
-void getCommonInput(uint16_t button_input){
+void resetGameState(){
+    player_1_health = PLAYER_MAX_HEALTH;
+    player_2_health = PLAYER_MAX_HEALTH;
+    player_1_raw_x = 64*256;
+    player_1_raw_y = 64*256;
+    player_1_speed_x = 0;
+    player_1_speed_y = 0;
+    player_2_raw_x = 20*16*256;
+    player_2_raw_y = 64*256;
+    player_2_speed_x = 0;
+    player_2_speed_y = 0;
+    
+    player_1_frame=0;
+    player_2_frame=0;
+    
+    // reset text:
+    show_text=EMPTY_STRING;
+}
+
+void debounceInputs(uint16_t button_input){
+    if (button_input & PAD_UP){
+        up_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    if (button_input & PAD_DOWN){
+        down_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    if (button_input & PAD_LEFT){
+        left_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    if (button_input & PAD_RIGHT){
+        right_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    
+    if (button_input & PAD_TRIANGLE){
+        triangle_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    if (button_input & PAD_SQUARE){
+        square_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    if (button_input & PAD_CIRCLE){
+        circle_was_pressed = FIFTH_OF_A_SECOND;
+    }
+    if (button_input & PAD_CROSS){
+        cross_was_pressed = FIFTH_OF_A_SECOND;
+    }
     if (button_input & PAD_START){
-        // reset everything
-        player_1_health = PLAYER_MAX_HEALTH;
-        player_2_health = PLAYER_MAX_HEALTH;
-        player_1_raw_x = 64*256;
-        player_1_raw_y = 64*256;
-        player_1_speed_x = 0;
-        player_1_speed_y = 0;
-        player_2_raw_x = 20*16*256;
-        player_2_raw_y = 64*256;
-        player_2_speed_x = 0;
-        player_2_speed_y = 0;
-        
-        player_1_frame=0;
-        player_2_frame=0;
-        
-        // reset text:
-        show_text=language_text+RESULT_EMPTY;
+        start_was_pressed = FIFTH_OF_A_SECOND;
     }
-    if ((button_input & PAD_SELECT) && (select_was_pressed <= 0)){
-        int message=show_text-language_text;
-        current_language++;
-        if (current_language>2){
-            current_language=0;
-        }
-        language_text=language_pointers[current_language];
-        show_text=language_text;
+    if (button_input & PAD_SELECT){
         select_was_pressed = FIFTH_OF_A_SECOND;
-        //printf("Select now: %d\n\n", select_was_pressed);
     }
-    else if (((button_input & PAD_SELECT)==0) && (select_was_pressed>0)){
-        //printf("Select decreasing: %d > %d\n", select_was_pressed, select_was_pressed-1);
+    
+    
+    if (((button_input & PAD_UP)==0) && (up_was_pressed>0)){
+        up_was_pressed--;
+    }
+    if (((button_input & PAD_DOWN)==0) && (down_was_pressed>0)){
+        down_was_pressed--;
+    }
+    if (((button_input & PAD_LEFT)==0) && (left_was_pressed>0)){
+        left_was_pressed--;
+    }
+    if (((button_input & PAD_RIGHT)==0) && (right_was_pressed>0)){
+        right_was_pressed--;
+    }
+    
+    if (((button_input & PAD_TRIANGLE)==0) && (triangle_was_pressed>0)){
+        triangle_was_pressed--;
+    }
+    if (((button_input & PAD_SQUARE)==0) && (square_was_pressed>0)){
+        square_was_pressed--;
+    }
+    if (((button_input & PAD_CIRCLE)==0) && (circle_was_pressed>0)){
+        circle_was_pressed--;
+    }
+    if (((button_input & PAD_CROSS)==0) && (cross_was_pressed>0)){
+        cross_was_pressed--;
+    }
+    
+    if (((button_input & PAD_START)==0) && (start_was_pressed>0)){
+        start_was_pressed--;
+    }
+    if (((button_input & PAD_SELECT)==0) && (select_was_pressed>0)){
         select_was_pressed--;
     }
+}
+
+void getResultScreenInput(uint16_t button_input){
+    if (button_input & PAD_START){
+        resetGameState();
+        game_mode = FIGHT_MODE;
+    }
+    if ((button_input & PAD_CROSS) && (cross_was_pressed <= 0)){
+        resetGameState();
+        game_mode = FIGHT_MODE;
+    }
+    if ((button_input & PAD_TRIANGLE) && (triangle_was_pressed <= 0)){
+        resetGameState();
+        initMainMenu();
+    }
+}
+
+void getMenuInput(uint16_t button_input){
+    if ((button_input & PAD_CROSS) && (cross_was_pressed <= 0)){
+        game_mode = exit_from_mode[game_mode];
+    }
+    if ((button_input & PAD_DOWN) && (down_was_pressed <= 0)){
+        current_menu_selection++;
+        if (current_menu_selection>=current_menu_options){
+            current_menu_selection=0;
+        }
+        //printf("menu selection: %d\n", current_menu_selection);
+    }
+    if ((button_input & PAD_UP) && (up_was_pressed <= 0)){
+        current_menu_selection--;
+        if (current_menu_selection<0){
+            current_menu_selection=current_menu_options-1;
+        }
+        //printf("menu selection: %d\n", current_menu_selection);
+    }
+}
+
+uint16_t randomNumber(){ // Not perfectly random, but might be good enough for single player
+    int step1=pseudoRandomState[(pseudoRandomStep+1)%RANDOM_STATE_SIZE];
+    int step2=pseudoRandomState[(pseudoRandomStep+2)%RANDOM_STATE_SIZE];
+    int r=step1+step2;
+    pseudoRandomState[pseudoRandomStep]=r;
+    pseudoRandomStep++;
+    pseudoRandomStep %=RANDOM_STATE_SIZE;
+    return (r);
+}
+
+void simulateInput(uint16_t player_id){
+    uint16_t button_input=0;
+    int should_go_to_the_right = 0;
+    if (player_2_raw_x<player_1_raw_x-6000){
+        should_go_to_the_right = 1;
+    }
+    else if (player_2_raw_x>player_1_raw_x+6000){
+        should_go_to_the_right = -1;
+    }
+    if (player_id==0){
+        should_go_to_the_right = 0-should_go_to_the_right;
+    }
+    if (should_go_to_the_right>0){
+        button_input |= PAD_RIGHT;
+    }
+    else if (should_go_to_the_right<0){
+        button_input |= PAD_LEFT;
+    }
+    int might_dodge = 0;
+    if ((player_id==1) && (player_1_frame==0)){
+        ai_dodge = 0;
+    }
+    else if ((player_id==0) && (player_2_frame==0)){
+        ai_dodge = 0;
+    }
+    if ((player_id==1) && (player_1_frame==2)){
+        ai_dodge = randomNumber()&1;
+    }
+    else if ((player_id==0) && (player_2_frame==2)){
+        ai_dodge = randomNumber()&1;
+    }
+    
+    if ((should_go_to_the_right==0) && ((randomNumber()&1)==1) && (ai_wait==0)){
+        button_input |= PAD_CROSS;
+    }
+    else if (ai_wait){
+        ai_wait--;
+    }
+    else{
+        ai_wait = FIFTH_OF_A_SECOND;
+    }
+    
+    if(ai_dodge){
+        button_input |= PAD_TRIANGLE;
+    }
+    
+    getInput (button_input, player_id);
 }
 
 void getInput(uint16_t button_input, uint16_t player_id){
         signed int player_move_x = 0;
         signed int player_move_y = 0;
-        
         
         signed int player_dash_state=player_1_dash_state;
         signed int player_punch_state=player_1_punch_state;
@@ -505,7 +735,7 @@ void getInput(uint16_t button_input, uint16_t player_id){
             //printf("dash state: %d\n", player_dash_state);
         }
         else if ((button_input & PAD_CROSS)&&(player_punch_state==0)){
-            player_punch_state=FIFTH_OF_A_SECOND*5;//half a second
+            player_punch_state=FIFTH_OF_A_SECOND*6;//half a second
             if (player_move_x<0){
                 player_punch_state=0-player_punch_state;
             }
@@ -535,6 +765,9 @@ void getInput(uint16_t button_input, uint16_t player_id){
             }
             punch=(FIFTH_OF_A_SECOND*5)-punch;
             int punch_frame=punch/FIFTH_OF_A_SECOND;
+            if (punch_frame>5){
+                punch_frame=5;
+            }
             player_frame = 1+punch_frame;
             //printf("punch: %d: %d, %d\n", player_punch_state, punch, punch_frame, player_frame);
         }
@@ -631,7 +864,7 @@ void drawHealth(){
     if(player_1_health>0){
         tile = (TILE*)nextPrim;
         setTile(tile);
-        setXY0(tile, 20, 200);
+        setXY0(tile, 10, 200);
         setWH(tile, player_1_health*(240/PLAYER_MAX_HEALTH), 20);
         setRGB0(tile, player_1_red[10], player_1_green[10], player_1_blue[10]);
         addPrim(orderingTables[currentBuffer], tile);
@@ -716,56 +949,113 @@ void handleHits(){
             player_1_frame=7;
         }
         
-    }
+    } // end of repeated code
     
     // FIXME: I'm setting a variable and then checking it? Maybe that's correct
-    if (player_1_health<=0 && player_2_health<=0){
-        show_text=language_text+RESULT_TIE;
+    if (player_1_health <=0 && player_2_health<=0){
+        show_text=RESULT_TIE;
+        game_mode = SHOW_RESULT;
     }
     else if (player_1_health<=0){
-        show_text=language_text+RESULT_TWO;
+        show_text=RESULT_TWO;
+        game_mode = SHOW_RESULT;
     }
     else if (player_2_health<=0){
-        show_text=language_text+RESULT_ONE;
+        show_text=RESULT_ONE;
+        game_mode = SHOW_RESULT;
     }
-    // end of repeated code
+    
 }
 
-void drawText(unsigned char *text){
+void drawText(unsigned char *text, int textY){
     int nextPlace=0;
     SPRT *sprite;
-    for (int textPlace=0; text[textPlace]!=0;textPlace++){
+    for (int textPlace=0; (text[textPlace]!=0)&&(text[textPlace]!=36);textPlace++){
         unsigned char oldc = text[textPlace];
         if (oldc!=' '){
-            unsigned int newc=oldc-65;
-            sprite = (SPRT*)nextPrim;
-            setSprt(sprite);
-            setXY0 (sprite, 50+nextPlace, 50);
-            setWH  (sprite, textSizs[newc]*2, 18);
-            setUV0 (sprite, (textRows[newc])*2, 18*textCols[newc]);
-            setClut(sprite, font_texture.crect->x, font_texture.crect->y);
-            setRGB0(sprite, 128, 128, 128); // what does this colour do and why do I need it?
-            addPrim(orderingTables[currentBuffer], sprite);
-          
-            nextPlace+=2*(textSizs[newc]+2);
-            nextPrim += sizeof(SPRT);
-            //printf("character: %d\n", newc);
+            if ((oldc>='A') && (oldc<='Z')){
+                unsigned int newc=oldc-65;
+                sprite = (SPRT*)nextPrim;
+                setSprt(sprite);
+                setXY0 (sprite, 50+nextPlace, textY);
+                setWH  (sprite, textSizs[newc]*2, 18);
+                setUV0 (sprite, (textRows[newc])*2, 18*textCols[newc]);
+                setClut(sprite, font_texture.crect->x, font_texture.crect->y);
+                setRGB0(sprite, 128, 128, 128); // what does this colour do and why do I need it?
+                addPrim(orderingTables[currentBuffer], sprite);
+              
+                nextPlace+=2*(textSizs[newc]+2);
+                nextPrim += sizeof(SPRT);
+                //printf("character: %d\n", newc);
+            }
+            if ((oldc>='0') && (oldc<='9')){
+                unsigned int newc=oldc-'0';
+                sprite = (SPRT*)nextPrim;
+                setSprt(sprite);
+                setXY0 (sprite, 50+nextPlace, textY);
+                setWH  (sprite, numSizs[newc]*2, 18);
+                setUV0 (sprite, (numRows[newc])*2, 18*12);
+                setClut(sprite, font_texture.crect->x, font_texture.crect->y);
+                setRGB0(sprite, 128, 128, 128);
+                addPrim(orderingTables[currentBuffer], sprite);
+                nextPlace+=2*(numSizs[newc]+2);
+                nextPrim += sizeof(SPRT);
+                //printf("character: %d\n", newc);
+            }
+            else if (oldc=='~'){
+                //unsigned int newc=oldc-65;
+                //puts("tilde");
+                sprite = (SPRT*)nextPrim;
+                setSprt(sprite);
+                setXY0 (sprite, 50+nextPlace, textY-12); // vertical "kerning"
+                setWH  (sprite, 11*2, 18);
+                setUV0 (sprite, 0*2, 18*11);
+                setClut(sprite, font_texture.crect->x, font_texture.crect->y);
+                setRGB0(sprite, 128, 128, 128); // what does this colour do and why do I need it?
+                addPrim(orderingTables[currentBuffer], sprite);
+              
+                //nextPlace+=2*(11+2);
+                nextPrim += sizeof(SPRT);
+                //printf("character at %d,%d size %d,%d\n", 50+nextPlace, textY-12, 11*2, 18);
+            }
         }
         else{
             nextPlace+=18;
         }
     }
 }
-    
+
+void drawMenu(){
+    TILE *tile=NULL;
+    int vPos=25;
+    for (int item=0;item<current_menu_options;item++){
+        drawText (&(language_text[menu_full[item]]), vPos+25);
+        vPos+=35;
+    }
+    if(current_menu_selection<current_menu_options){
+        tile = (TILE*)nextPrim;
+        setTile(tile);
+        setXY0(tile, 15, 45 + current_menu_selection*35);
+        setWH(tile, 20, 30);
+        setRGB0(tile, 255, 255, 128);
+        addPrim(orderingTables[currentBuffer], tile);
+        nextPrim += sizeof(TILE);
+    }
+        
+}
 
 int main() {
     initDisplay();
     initControllers();
+    initModes();
 
     int controller_type = 0;
     uint16_t button_input_1 = 0;
     uint16_t button_input_2 = 0;
+    initLanguageMenu();
     while(1) {
+        ClearOTagR(orderingTables[currentBuffer], OTLENGTH);
+        language_text=language_pointers[current_language];
         button_input_1 = 0;
         button_input_2 = 0;
         if (controller_buffers[0][0] == 0){
@@ -779,26 +1069,52 @@ int main() {
         }
         
         
-        if ((player_1_health>0) && (player_2_health>0)){
+        if ((game_mode==LANGUAGE_MENU) || (game_mode==MAIN_MENU)){
+            getMenuInput(button_input_1|button_input_2);
+            drawMenu();
+        }
+        else if (game_mode==SHOW_RESULT){
+            if(show_text != EMPTY_STRING){
+                drawText (&(language_text[show_text]), 25);
+            }
+            getResultScreenInput(button_input_1|button_input_2);
+            drawHealth();
+        }
+        else if (game_mode==FIGHT_MODE){
             getInput(button_input_1, 0);
-            getInput(button_input_2, 1);
+            if (amount_of_players==2){
+                getInput(button_input_2, 1);
+            }
+            else{
+                simulateInput(1);
+            }
+            handleHits();
+            drawHealth();
         }
-        else{
-            getCommonInput(button_input_1|button_input_2);
+        if (game_mode==MENU_LEAVE_LANGUAGES){
+            current_language=current_menu_selection;
+            resetGameState();
+            initMainMenu();
         }
-
-        ClearOTagR(orderingTables[currentBuffer], OTLENGTH); 
-        
-        handleHits();
-        drawText (show_text);
-        drawHealth();
+        else if (game_mode==MENU_LEAVE_MAIN){
+            if (current_menu_selection==2){
+                initLanguageMenu();
+            }
+            else{
+                resetGameState();
+                amount_of_players = current_menu_selection+1;
+                printf("amount_of_players: %d\n", amount_of_players);
+                game_mode=FIGHT_MODE;
+            }
+        }
+        debounceInputs(button_input_1|button_input_2);
         
         setPlayer1Frame(player_1_frame);
         drawPlayer(0);
         setPlayer1Frame(player_2_frame);
         drawPlayer(1);
-        // Update the display
-        showDisplay();
+        
+        swapBuffers();
         
     }
     
