@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<iso_project
+	image_name="buildn/cfacn.bin"
+	cue_sheet="buildn/cfacn.cue"
+>
+	<track type="data">
+		<identifiers
+			system			="PLAYSTATION"
+			volume			="CUTFORACOUNTRY{REGION_LETTER_UPP}"
+			volume_set		="CUTFORACOUNTRY"
+			publisher		="SEALITERAL"
+			data_preparer	="PSN00BSDK AND PYTHON"
+			application		="PLAYSTATION"
+			copyright		="README.TXT;1"
+		/>
+
+		<directory_tree>
+			<file name="SYSTEM.CNF"		type="data" source="system-{REGION_NAME_LOW}.cnf" />
+			<file name="CUTFCOUN.TR{REGION_LETTER_UPP}"	type="data" source="buildn/cutfcoun.tr{REGION_LETTER_SMALL}" />
+			<file name="README.TXT"	type="data" source="readme.md" />
+			<!-- <file name="CFACN.MAP"	type="data" source="buildn/cfacn.elf.map" /> -->
+
+			<dummy sectors="1024"/>
+		</directory_tree>
+	</track>
+
+	<!-- <track type="audio" source="glul.wav" /> -->
+</iso_project>
