@@ -1,5 +1,5 @@
 /*
- * Cut for a Country: a fighting game for the PS1
+ * Cut for a Country: a homebrew fighting game for the PS1
  * using PSn00bSDK.
  * TODO: put each player into a structure
  * so that I can use the same code on both structures,
@@ -16,7 +16,6 @@
 #include <psxpad.h>
 #include <psxapi.h>
 #include <stdio.h>
-
 
 #include "colour-names.h"
 #define PLAYER_VERTS_COUNT 255 // so that each vertex index fits in a byte
@@ -70,16 +69,18 @@ void setPlayer1Frame(int f);
 void drawText(unsigned char *text, int textY);
 int main();
 
-enum Game_Modes { // remember to adjust the count
+
+enum Game_Modes {
     LANGUAGE_MENU,
     MAIN_MENU,
-    CHARACTER_MENU,
+    CHARACTERS_MENU,
     SHOW_RESULT,
     MENU_LEAVE_LANGUAGES,
     MENU_LEAVE_MAIN,
+    MENU_LEAVE_CHARACTERS,
     FIGHT_MODE,
+    AMOUNT_OF_GAME_MODES,
 } game_mode=FIGHT_MODE;
-# define AMOUNT_OF_GAME_MODES 9
 int exit_from_mode[AMOUNT_OF_GAME_MODES];
 int amount_of_players=2;
 
@@ -87,12 +88,13 @@ int amount_of_players=2;
 DISPENV dispenvs[2];
 DRAWENV drawenvs[2];
 int currentBuffer = 0;
+int current_frame=0;
 
 uint16_t button_filter;
 
 u_long orderingTables[2][OTLENGTH];
 char primBuff[2][OTLENGTH];
-char *nextPrim;
+char *next_prim;
 
 // variables that each player needs
 // FIXME: animations are player specific in a different way,
@@ -114,6 +116,9 @@ typedef struct player_mesh{
     int tri_count;
 } Player_Mesh;
 
+// FIXME: This could use an enum
+#define CHARACTER_JUUL 0
+#define CHARACTER_GULLEROD 1
 
 typedef struct player{
     int raw_x;
@@ -127,12 +132,12 @@ typedef struct player{
     int frame;
     int16_t dash_state;
     int16_t punch_state;
+    int16_t character_id;
     AI ai;
     Player_Mesh mesh;
 } Player;
 
 
-//uint8_t *player_1_colrefs=NULL;
 
 Player player_1, player_2;
 
@@ -143,7 +148,10 @@ int player_scale_y=5;
 
 int current_screen_time;
 
-// int player_1_block.state=0; // Just checking animation frame for now
+int unlocked_characters=0;
+char last_winner = 0;
+char won_last_fight = 0;
+
 
 // for the controllers
 u_char controller_buffers[2][34];
@@ -153,28 +161,19 @@ TIM_IMAGE font_texture;
 
 //                            0    5   10   15   20   25   30   35   40   45   50   55   60   65   70   75   80
 //                            0                 19                37            51    57               74
-unsigned char all_texts_da[]="$SPILLER 1 VANDT$  SPILLER 2 VANDT$  DET BLEV LIGE$DANSK$ENGLISH$ESPAN~OL$1 SPILLER$2 SPILLERE$ SPROG$  $DEMONSTRATION";
-unsigned char all_texts_en[]="$PLAYER 1  WINS$   PLAYER 2 WINS$    PLAYERS TIED$ DANSK$ENGLISH$ESPAN~OL$1 PLAYER$ 2 PLAYERS$  LANGUAGE$DEMO";
-unsigned char all_texts_es[]="$GANA EL JUGADOR 1$GANA EL JUGADOR 2$EMPATE$       DANSK$ENGLISH$ESPAN~OL$1 JUGADOR$2 JUGADORES$IDIOMA$ $DEMONSTRACIO[N";
+//unsigned char all_texts_da[]="$SPILLER 1 VANDT$  SPILLER 2 VANDT$  DET BLEV LIGE$DANSK$ENGLISH$ESPAN~OL$1 SPILLER$2 SPILLERE$ SPROG$  $DEMONSTRATION";
+//unsigned char all_texts_en[]="$PLAYER 1 WINS$    PLAYER 2 WINS$    PLAYERS TIED$ DANSK$ENGLISH$ESPAN~OL$1 PLAYER$ 2 PLAYERS$  LANGUAGE$DEMO";
+//unsigned char all_texts_es[]="$GANA EL JUGADOR 1$GANA EL JUGADOR 2$EMPATE$       DANSK$ENGLISH$ESPAN~OL$1 JUGADOR$2 JUGADORES$IDIOMA$ $DEMONSTRACIO[N";
 
-#define EMPTY_STRING 0
-#define RESULT_ONE 1
-#define RESULT_TWO 19
-#define RESULT_TIE 37
-#define LANGUAGE_DA 51
-#define LANGUAGE_EN 57
-#define LANGUAGE_ES 65
-#define ONE_PLAYER 74
-#define TWO_PLAYERS 84
-#define LANGUAGE_OPTIONS 96
-#define DEMO_OPTION 105
+#include "build-tr/ui_ps1.h"
+// TODO: create translation_data from translation_contents
 
-unsigned char *language_text=all_texts_en;
+//unsigned char *language_text=all_texts_en;
 
-unsigned char *language_pointers[]={all_texts_da, all_texts_en, all_texts_es};
+//unsigned char *language_pointers[3];
 int current_language=1; // English
 
-int show_text=EMPTY_STRING;
+int show_text=UI_EMPTY_STRING;
 #define MENU_MAX_OPTIONS 4
 int menu_full[MENU_MAX_OPTIONS];
 int current_menu_options = 0;
@@ -183,13 +182,41 @@ int current_menu_selection=0;
 
 // #include "player_1_xyc.h"
 #include "player_1_animations.h"
-
+// TODO: Rename "player_1" and "player1" to "juul" in animations
 char *juul_frames_x[]={player1verts_x_stille_0,
                        player1verts_x_slag_0, player1verts_x_slag_1,player1verts_x_slag_2, player1verts_x_slag_3, player1verts_x_slag_3,
                        player1verts_x_block_0,
                        player1verts_x_nede_0
-                       };//////////// WIP
-
+                       };
+                       
+char *juul_frames_y[]={player1verts_y_stille_0,
+                       player1verts_y_slag_0, player1verts_y_slag_1,player1verts_y_slag_2, player1verts_y_slag_3, player1verts_y_slag_3,
+                       player1verts_y_block_0,
+                       player1verts_y_nede_0
+                       };
+char *juul_trirefs[]= {player_1_trirefs_stille_0,
+                       player_1_trirefs_slag_0, player_1_trirefs_slag_1,player_1_trirefs_slag_2, player_1_trirefs_slag_3, player_1_trirefs_slag_3,
+                       player_1_trirefs_block_0,
+                       player_1_trirefs_nede_0
+                       };
+char *juul_colrefs[]={player_1_colrefs_stille_0,
+                       player_1_colrefs_slag_0, player_1_colrefs_slag_1,player_1_colrefs_slag_2, player_1_colrefs_slag_3, player_1_colrefs_slag_3,
+                       player_1_colrefs_block_0,
+                       player_1_colrefs_nede_0
+                       };
+                       
+int juul_vert_counts[]={253,
+                       253, 253, 253, 253, 253,
+                       249,
+                       255
+                       };
+int juul_tri_counts[]={251,
+                       251, 251, 251, 251, 251,
+                       249,
+                       225
+                       };
+#include "build-characters/gullerod-animations.h"
+#include "build-characters/gullerod-framelist.h"
 
 int8_t select_was_pressed = 0;
 int8_t start_was_pressed = 0;
@@ -204,10 +231,10 @@ int8_t triangle_was_pressed = 0;
 
 // Positions of different letters on the spritesheet
 
-                    //    A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
-signed char textCols[]={  5,  3,  1,  6,  7,  8,  9,  2,  2,  0,  5,  6,  4, 10,  5,  4,  6,  7,  8,  9,  7,  8,  0,  9, 10, 13, -1};
-signed char textRows[]={ 12, 15, 16, 12, 12, 12, 12, 16, 44, 18, 23, 23,  0, 12,  0, 24,  0, 23, 23, 23,  0,  0,  0,  0,  0, 4, -1};
-signed char textSizs[]={ 11, 10, 10, 11, 11, 11, 11, 10,  4, 10, 10, 10, 13, 11,  12, 9, 12, 10, 10, 10, 12, 12, 18, 12, 12, 11, -1};
+                    //    A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z   Æ
+signed char textCols[]={  5,  3,  1,  6,  7,  8,  9,  2,  2,  0,  5,  6,  4, 10,  5,  4,  6,  7,  8,  9,  7,  8,  0,  9, 10,   4,  3, -1};
+signed char textRows[]={ 12, 15, 16, 12, 12, 12, 12, 16, 44, 18, 23, 23,  0, 12,  0, 24,  0, 23, 23, 23,  0,  0,  0,  0,  0,  13,  0, -1};
+signed char textSizs[]={ 11, 10, 10, 11, 11, 11, 11, 10,  4, 10, 10, 10, 13, 11,  12, 9, 12, 10, 10, 10, 12, 12, 18, 12, 12, 11, 15, -1};
 
 //                       0   1   2   3   4   5   6   7   8   9
 signed char numSizs[]={ 11,  6, 10,  9,  9, 10, 10,  7, 10,  9};
@@ -216,7 +243,7 @@ signed char numRows[]={  0, 11, 17, 27, 36, 45, 55, 65, 72, 82};
 void initModes(){
     exit_from_mode[LANGUAGE_MENU]=MENU_LEAVE_LANGUAGES;
     exit_from_mode[MAIN_MENU] = MENU_LEAVE_MAIN;
-    exit_from_mode[CHARACTER_MENU]=FIGHT_MODE;
+    exit_from_mode[CHARACTERS_MENU]=MENU_LEAVE_CHARACTERS;
     exit_from_mode[FIGHT_MODE]=SHOW_RESULT;
     exit_from_mode[SHOW_RESULT]=FIGHT_MODE;
     exit_from_mode[MENU_LEAVE_LANGUAGES]=FIGHT_MODE;
@@ -227,7 +254,7 @@ void initMenu(int selection){
     current_menu_selection = selection;
     current_menu_options=0;
     for (int i=0;i<MENU_MAX_OPTIONS;i++){
-        menu_full[i] = EMPTY_STRING;
+        menu_full[i] = UI_EMPTY_STRING;
     }
     current_screen_time++;
 }
@@ -243,19 +270,31 @@ int addMenuOption(int string_id){
 
 void initLanguageMenu(){
     initMenu(1);
-    addMenuOption (LANGUAGE_DA);
-    addMenuOption (LANGUAGE_EN);
-    addMenuOption (LANGUAGE_ES);
+    addMenuOption (UI_LANG_DA);
+    addMenuOption (UI_LANG_EN);
+    addMenuOption (UI_LANG_ES);
     game_mode = LANGUAGE_MENU;
 }
 
 void initMainMenu(){
     initMenu(amount_of_players-1);
-    addMenuOption (ONE_PLAYER);
-    addMenuOption (TWO_PLAYERS);
-    addMenuOption (LANGUAGE_OPTIONS);
-    addMenuOption (DEMO_OPTION);
+    addMenuOption (UI_MM_1_PLAYER);
+    addMenuOption (UI_MM_2_PLAYERS);
+    addMenuOption (UI_OM_LANGUAGE);
+    current_screen_time = 0;
+    // addMenuOption (UI_MM_TEST);
     game_mode = MAIN_MENU;
+    if (amount_of_players==0){
+        current_menu_selection = 0;
+    }
+}
+
+void initCharactersMenu(){
+    initMenu(0);
+    printf("Entering characters menu\n");
+    addMenuOption (UI_CH_JUUL_NAME);
+    addMenuOption (UI_CH_GULLEROD_NAME);
+    game_mode = CHARACTERS_MENU;
     if (amount_of_players==0){
         current_menu_selection = 3;
     }
@@ -270,90 +309,51 @@ void setPlayerFrame(int f, int player_id){
         player = &player_2;
     }
     
-    if (f<=7){
-        //////////// WIP
-        player->mesh.verts_x=juul_frames_x[f];
-    }
-    
-    if (f==0){
-        //player->mesh.verts_x = player1verts_x_stille_0;
-        player->mesh.verts_y = player1verts_y_stille_0;
-        player->mesh.trirefs = player_1_trirefs_stille_0;
-        player->mesh.colrefs = player_1_colrefs_stille_0;
+    if (player->character_id==CHARACTER_JUUL){
+        if (f<=7){
+            //////////// WIP
+            player->mesh.verts_x=juul_frames_x[f];
+            player->mesh.verts_y=juul_frames_y[f];
+            player->mesh.trirefs=juul_trirefs[f];
+            player->mesh.colrefs=juul_colrefs[f];
+            player->mesh.vert_count=juul_vert_counts[f];
+            player->mesh.vert_count=juul_tri_counts[f];
+            return;
+        }
         
-        player->mesh.vert_count = player_1_vert_count_stille_0;
-        player->mesh.tri_count = player_1_tri_count_stille_0;
-        return;
+        if ((f>=20)&&(f<20+FIFTH_OF_A_SECOND)){
+            player->mesh.verts_x = player1verts_x_stille_0;
+            player->mesh.verts_y = player1verts_y_stille_0;
+            player->mesh.trirefs = player_1_trirefs_stille_0;
+            player->mesh.colrefs = player_1_colrefs_stille_0;
+            
+            player->mesh.vert_count = player_1_vert_count_stille_0;
+            player->mesh.vert_count = player_1_tri_count_stille_0;
+            return;
+        }
     }
-    if (f==1){
-        //player->mesh.verts_x = player1verts_x_slag_0;
-        player->mesh.verts_y = player1verts_y_slag_0;
-        player->mesh.trirefs = player_1_trirefs_slag_0;
-        player->mesh.colrefs = player_1_colrefs_slag_0;
+    else{
+        if (f<=7){
+            //////////// WIP
+            player->mesh.verts_x=gullerod_frames_x[f];
+            player->mesh.verts_y=gullerod_frames_y[f];
+            player->mesh.trirefs=gullerod_trirefs[f];
+            player->mesh.colrefs=gullerod_colrefs[f];
+            player->mesh.vert_count=gullerod_vert_counts[f];
+            player->mesh.vert_count=gullerod_tri_counts[f];
+            return;
+        }
         
-        player->mesh.vert_count = player_1_vert_count_slag_0;
-        player->mesh.vert_count = player_1_tri_count_slag_0;
-        return;
-    }
-    if (f==2){
-        //player->mesh.verts_x = player1verts_x_slag_1;
-        player->mesh.verts_y = player1verts_y_slag_1;
-        player->mesh.trirefs = player_1_trirefs_slag_1;
-        player->mesh.colrefs = player_1_colrefs_slag_1;
-        
-        player->mesh.vert_count = player_1_vert_count_slag_1;
-        player->mesh.vert_count = player_1_tri_count_slag_1;
-        return;
-    }
-    if (f==3){
-        //player->mesh.verts_x = player1verts_x_slag_2;
-        player->mesh.verts_y = player1verts_y_slag_2;
-        player->mesh.trirefs = player_1_trirefs_slag_2;
-        player->mesh.colrefs = player_1_colrefs_slag_2;
-        
-        player->mesh.vert_count = player_1_vert_count_slag_2;
-        player->mesh.vert_count = player_1_tri_count_slag_2;
-        return;
-    }
-    if (f==4 || f==5){
-        //player->mesh.verts_x = player1verts_x_slag_3;
-        player->mesh.verts_y = player1verts_y_slag_3;
-        player->mesh.trirefs = player_1_trirefs_slag_3;
-        player->mesh.colrefs = player_1_colrefs_slag_3;
-        
-        player->mesh.vert_count = player_1_vert_count_slag_3;
-        player->mesh.vert_count = player_1_tri_count_slag_3;
-        return;
-    }
-    if (f==6){
-        //player->mesh.verts_x = player1verts_x_block_0;
-        player->mesh.verts_y = player1verts_y_block_0;
-        player->mesh.trirefs = player_1_trirefs_block_0;
-        player->mesh.colrefs = player_1_colrefs_block_0;
-        
-        player->mesh.vert_count = player_1_vert_count_block_0;
-        player->mesh.vert_count = player_1_tri_count_block_0;
-        return;
-    }
-    if (f==7){
-        //player->mesh.verts_x = player1verts_x_nede_0;
-        player->mesh.verts_y = player1verts_y_nede_0;
-        player->mesh.trirefs = player_1_trirefs_nede_0;
-        player->mesh.colrefs = player_1_colrefs_nede_0;
-        
-        player->mesh.vert_count = player_1_vert_count_nede_0;
-        player->mesh.vert_count = player_1_tri_count_nede_0;
-        return;
-    }
-    if ((f>=20)&&(f<20+FIFTH_OF_A_SECOND)){
-        player->mesh.verts_x = player1verts_x_stille_0;
-        player->mesh.verts_y = player1verts_y_stille_0;
-        player->mesh.trirefs = player_1_trirefs_stille_0;
-        player->mesh.colrefs = player_1_colrefs_stille_0;
-        
-        player->mesh.vert_count = player_1_vert_count_stille_0;
-        player->mesh.vert_count = player_1_tri_count_stille_0;
-        return;
+        if ((f>=20)&&(f<20+FIFTH_OF_A_SECOND)){
+            player->mesh.verts_x = gullerod_verts_x_stille_0;
+            player->mesh.verts_y = gullerod_verts_y_stille_0;
+            player->mesh.trirefs = gullerod_trirefs_stille_0;
+            player->mesh.colrefs = gullerod_colrefs_stille_0;
+            
+            player->mesh.vert_count = gullerod_vert_count_stille_0;
+            player->mesh.vert_count = gullerod_tri_count_stille_0;
+            return;
+        }
     }
 }
 
@@ -383,14 +383,20 @@ void initDisplay(){
                           //  but for now I'm not drawing a background, so I need to enable clearing.
     drawenvs[1].isbg = 1;
 
-    nextPrim = primBuff[0];
+    next_prim = primBuff[0];
     
     loadFont();
 }
 
 void swapBuffers() {
+    int new_frame=0;
     DrawSync(0);
-    VSync(0);
+    do{
+        VSync(0);
+        new_frame=VSync(-1);
+    }
+    while (new_frame==current_frame);
+    current_frame=new_frame;
 
     PutDispEnv(&dispenvs[currentBuffer]);
     PutDrawEnv(&drawenvs[currentBuffer]);
@@ -399,7 +405,7 @@ void swapBuffers() {
 
     DrawOTag(orderingTables[currentBuffer]+OTLENGTH-1);
     currentBuffer = !currentBuffer;
-    nextPrim = primBuff[currentBuffer];
+    next_prim = primBuff[currentBuffer];
     
 }
 
@@ -445,6 +451,11 @@ void drawPlayer(int playerNum){
     uint8_t *player_red=player_1_red;
     uint8_t *player_green=player_1_green;
     uint8_t *player_blue=player_1_blue;
+    if (player->character_id==CHARACTER_GULLEROD){
+        player_red  = gullerod_red;
+        player_green= gullerod_green;
+        player_blue = gullerod_blue;
+    }
     int scale_x = player_scale_x;
     int scale_y = player_scale_y;
     int side_scale_x=1;
@@ -458,6 +469,11 @@ void drawPlayer(int playerNum){
         player_red=player_2_red;
         player_green=player_2_green;
         player_blue=player_2_blue;
+        if (player->character_id==CHARACTER_GULLEROD){
+            player_red  = gullerod_2_red;
+            player_green= gullerod_2_green;
+            player_blue = gullerod_2_blue;
+        }
         side_scale_x=-1;
         side_offset=256;
         
@@ -480,7 +496,7 @@ void drawPlayer(int playerNum){
             int tri_v3 = player->mesh.trirefs[tri_place+2];
             int tri_index=tri_v1;
             
-            triangle = (POLY_G3*)nextPrim;
+            triangle = (POLY_G3*)next_prim;
             setPolyG3 (triangle);
             setXY3 (triangle, player->pixel_x+(((int16_t)player->mesh.verts_x[tri_v1]*side_scale_x+side_offset)*scale_x)/16,
                               player->pixel_y+(((int16_t)player->mesh.verts_y[tri_v1])*scale_y)/16,
@@ -510,11 +526,12 @@ void drawPlayer(int playerNum){
             
              addPrim(orderingTables[currentBuffer], triangle);
             
-            nextPrim += sizeof(POLY_G3);
+            next_prim += sizeof(POLY_G3);
         }
 }
 
 void resetGameState(){
+    won_last_fight = 0;
     Player *player = &player_1;
     for (int i=0;i<2;i++){
     // stuff shared by both players
@@ -530,6 +547,7 @@ void resetGameState(){
     player->ai.dodge = 0;
     player->ai.dodge_wait = 0;
     player->ai.attack_wait = 0;
+    // player->character_id = CHARACTER_JUUL;
     
     player = &player_2;
     }
@@ -540,7 +558,7 @@ void resetGameState(){
     player_2.pixel_x=player_2.raw_x*player_scale_x/128/16;
     
     // reset text:
-    show_text=EMPTY_STRING;
+    show_text=UI_EMPTY_STRING;
 }
 
 uint16_t debounceInputs(uint16_t button_input){
@@ -648,13 +666,19 @@ uint16_t debounceInputs(uint16_t button_input){
 }
 
 void getResultScreenInput(uint16_t button_input){
-    if (button_input & PAD_START){
-        resetGameState();
-        game_mode = FIGHT_MODE;
-    }
-    if ((button_input & PAD_CROSS) && (cross_was_pressed <= 0)){
-        resetGameState();
-        game_mode = FIGHT_MODE;
+    //printf ("PLAYER_ONE_ID: %d, last_winner: %d\n", PLAYER_ONE_ID, last_winner);
+    if ( (button_input & PAD_START) || ((button_input & PAD_CROSS) && (cross_was_pressed <= 0)) ){
+        if ((amount_of_players<=1) && (last_winner==PLAYER_ONE_ID)){
+            player_2.character_id = CHARACTER_GULLEROD;
+        }
+        if(won_last_fight==0){
+            resetGameState();
+            game_mode = FIGHT_MODE;
+        }
+        else{
+            resetGameState();
+            initMainMenu();
+        }
     }
     if ((button_input & PAD_TRIANGLE) && (triangle_was_pressed <= 0)){
         resetGameState();
@@ -711,11 +735,15 @@ void simulateInput(uint16_t player_id){
         this_player = &player_2;
         other_player= &player_1;
     }
+    uint16_t dodge_thresold = 5;
+    if (this_player->character_id == CHARACTER_GULLEROD){
+        dodge_thresold = 3;
+    }
     
-    if (this_player->raw_x<other_player->raw_x-6000){
+    if (this_player->raw_x<other_player->raw_x-7500){
         should_go_to_the_right = 1;
     }
-    else if (this_player->raw_x>other_player->raw_x+6000){
+    else if (this_player->raw_x>other_player->raw_x+7500){
         should_go_to_the_right = -1;
     }
     
@@ -733,7 +761,7 @@ void simulateInput(uint16_t player_id){
     if ( (this_player->ai.dodge_wait==0) &&
          (other_player->frame==2) &&
          (this_player->ai.dodge==0) ){
-        this_player->ai.dodge = randomNumber()&1;
+        this_player->ai.dodge = ((randomNumber()&7) > dodge_thresold);
         //printf("Could try to dodge\n");
         if (this_player->ai.dodge==0){
             this_player->ai.dodge_wait=FIFTH_OF_A_SECOND;
@@ -907,24 +935,24 @@ void drawHealth(){
     TILE *tile;
     // player 1
     if(player_1.health>0){
-        tile = (TILE*)nextPrim;
+        tile = (TILE*)next_prim;
         setTile(tile);
         setXY0(tile, 10, 200);
         setWH(tile, player_1.health*(240/PLAYER_MAX_HEALTH), 20);
         setRGB0(tile, player_1_red[10], player_1_green[10], player_1_blue[10]);
         addPrim(orderingTables[currentBuffer], tile);
-        nextPrim += sizeof(TILE);
+        next_prim += sizeof(TILE);
     }
         
     // player 2
     if(player_2.health>0){
-        tile = (TILE*)nextPrim;
+        tile = (TILE*)next_prim;
         setTile(tile);
         setXY0(tile, 10+256, 200);
         setWH(tile, player_2.health*(240/PLAYER_MAX_HEALTH), 20);
         setRGB0(tile, player_2_red[10], player_2_green[10], player_2_blue[10]);
         addPrim(orderingTables[currentBuffer], tile);
-        nextPrim += sizeof(TILE);
+        next_prim += sizeof(TILE);
     }
 }
 
@@ -998,19 +1026,31 @@ void handleHits(){
     
     // FIXME: I'm setting a variable and then checking it? Maybe that's correct
     if (player_1.health <=0 && player_2.health<=0){
-        show_text=RESULT_TIE;
+        show_text=UI_RE_TIE;
         game_mode = SHOW_RESULT;
+        last_winner=-1;
         current_screen_time=0;
     }
     else if (player_1.health<=0){
-        show_text=RESULT_TWO;
+        show_text=UI_RE_WINNER_2;
         game_mode = SHOW_RESULT;
+        last_winner=PLAYER_TWO_ID;
         current_screen_time=0;
     }
     else if (player_2.health<=0){
-        show_text=RESULT_ONE;
+        show_text=UI_RE_WINNER_1;
         game_mode = SHOW_RESULT;
+        last_winner=PLAYER_ONE_ID;
         current_screen_time=0;
+        if ((player_2.character_id==CHARACTER_GULLEROD)&&
+            (unlocked_characters<1)){
+            unlocked_characters=1;
+            won_last_fight = 1;
+            show_text=UI_SM_BEAT_GULLEROD;
+        }
+    }
+    if (game_mode==SHOW_RESULT && amount_of_players==0){
+        show_text = UI_AT_PRESS_SOMETHING;
     }
 }
 
@@ -1023,7 +1063,12 @@ void drawText(unsigned char *text, int textY){
         if (oldc!=' '){
             if ((oldc>='A') && (oldc<='Z')){
                 unsigned int newc=oldc-65;
-                sprite = (SPRT*)nextPrim;
+                /*if (oldc=='Z'){
+                    printf("U: %d, V:%d, textSizs[newc]: %d\n",
+                    (textRows[newc])*2,
+                    18*textCols[newc], textSizs[newc]);
+                }*/
+                sprite = (SPRT*)next_prim;
                 setSprt(sprite);
                 setXY0 (sprite, 50+nextPlace, textY);
                 setWH  (sprite, textSizs[newc]*2, 18);
@@ -1033,13 +1078,13 @@ void drawText(unsigned char *text, int textY){
                 addPrim(orderingTables[currentBuffer], sprite);
               
                 nextPlace+=2*(textSizs[newc]+2);
-                nextPrim += sizeof(SPRT);
+                next_prim += sizeof(SPRT);
                 prev_width = textSizs[newc]; // Intentionally just half the width!
                 //printf("character: %d\n", newc);
             }
             if ((oldc>='0') && (oldc<='9')){
                 unsigned int newc=oldc-'0';
-                sprite = (SPRT*)nextPrim;
+                sprite = (SPRT*)next_prim;
                 setSprt(sprite);
                 setXY0 (sprite, 50+nextPlace, textY);
                 setWH  (sprite, numSizs[newc]*2, 18);
@@ -1048,14 +1093,14 @@ void drawText(unsigned char *text, int textY){
                 setRGB0(sprite, 128, 128, 128);
                 addPrim(orderingTables[currentBuffer], sprite);
                 nextPlace+=2*(numSizs[newc]+2);
-                nextPrim += sizeof(SPRT);
+                next_prim += sizeof(SPRT);
                 prev_width = textSizs[newc]; // Intentionally just half the width!
                 //printf("character: %d\n", newc);
             }
             else if (oldc=='~'){
                 //unsigned int newc=oldc-65;
                 //puts("tilde");
-                sprite = (SPRT*)nextPrim;
+                sprite = (SPRT*)next_prim;
                 setSprt(sprite);
                 //setXY0 (sprite, 50+nextPlace, textY-12); // textY-12: keep this glyph close to the one below
                 setXY0 (sprite, 50+nextPlace-prev_width-2-11, textY-12); // subtract half the width of the previous character, and half the width of this one, and the gap between characters
@@ -1066,13 +1111,13 @@ void drawText(unsigned char *text, int textY){
                 addPrim(orderingTables[currentBuffer], sprite);
               
                 //nextPlace+=2*(11+2);
-                nextPrim += sizeof(SPRT);
+                next_prim += sizeof(SPRT);
                 //printf("character at %d,%d size %d,%d\n", 50+nextPlace, textY-12, 11*2, 18);
             }
-            else if (oldc=='['){
+            else if (oldc==180){ // ´, acute accent
                 //unsigned int newc=oldc-65;
                 //puts("tilde");
-                sprite = (SPRT*)nextPrim;
+                sprite = (SPRT*)next_prim;
                 setSprt(sprite);
                 setXY0 (sprite, 50+nextPlace-prev_width-2-4, textY-10); // subtract half the width of the previous character, and half the width of this one, and the gap between characters
                 setWH  (sprite, 4*2, 18);
@@ -1082,8 +1127,12 @@ void drawText(unsigned char *text, int textY){
                 addPrim(orderingTables[currentBuffer], sprite);
               
                 //nextPlace+=2*(11+2);
-                nextPrim += sizeof(SPRT);
+                next_prim += sizeof(SPRT);
                 //printf("character at %d,%d size %d,%d\n", 50+nextPlace, textY-12, 11*2, 18);
+            }
+            else if (oldc=='\n'){
+                nextPlace = 0;
+                textY += 35;
             }
         }
         else{
@@ -1096,17 +1145,21 @@ void drawMenu(){
     TILE *tile=NULL;
     int vPos=25;
     for (int item=0;item<current_menu_options;item++){
+        char *language_text = &translation_contents;
+        language_text = &(language_text[language_size*current_language]);
+        
+        //char test_text[]="TEST";
         drawText (&(language_text[menu_full[item]]), vPos+25);
         vPos+=35;
     }
     if(current_menu_selection<current_menu_options){
-        tile = (TILE*)nextPrim;
+        tile = (TILE*)next_prim;
         setTile(tile);
         setXY0(tile, 15, 45 + current_menu_selection*35);
         setWH(tile, 20, 30);
         setRGB0(tile, 255, 255, 128);
         addPrim(orderingTables[currentBuffer], tile);
-        nextPrim += sizeof(TILE);
+        next_prim += sizeof(TILE);
     }
         
 }
@@ -1121,9 +1174,11 @@ int main() {
     uint16_t button_input_2 = 0;
     initLanguageMenu();
     resetGameState();
+    player_1.character_id = CHARACTER_JUUL;
+    player_2.character_id = CHARACTER_JUUL;
     while(1) {
         ClearOTagR(orderingTables[currentBuffer], OTLENGTH);
-        language_text=language_pointers[current_language];
+        //language_text=language_pointers[current_language];
         button_input_1 = 0;
         button_input_2 = 0;
         if (controller_buffers[0][0] == 0){
@@ -1137,12 +1192,19 @@ int main() {
         }
         
         
-        if ((game_mode==LANGUAGE_MENU) || (game_mode==MAIN_MENU)){
+        if ((game_mode==LANGUAGE_MENU) || (game_mode==MAIN_MENU) || (game_mode==CHARACTERS_MENU)){
             getMenuInput(button_input_1|button_input_2);
             drawMenu();
+            if (current_screen_time > FIFTH_OF_A_SECOND*5*20){
+                resetGameState();
+                amount_of_players = 0;
+                game_mode=FIGHT_MODE;
+        }
         }
         else if (game_mode==SHOW_RESULT){
-            if(show_text != EMPTY_STRING){
+            if(show_text != UI_EMPTY_STRING){
+                char *language_text = &translation_contents;
+                language_text = &(language_text[language_size*current_language]);
                 drawText (&(language_text[show_text]), 25);
             }
             if (amount_of_players){
@@ -1156,6 +1218,11 @@ int main() {
         else if (game_mode==FIGHT_MODE){
             if (amount_of_players==0){
                 getAttractInput((button_input_1|button_input_2)&button_filter);
+                if((current_screen_time%(FIFTH_OF_A_SECOND*50))<30){
+                    char *language_text = &translation_contents;
+                    language_text = &(language_text[language_size*current_language]);
+                    drawText (&(language_text[UI_AT_PRESS_SOMETHING]), 25);
+                }
             }
             if (amount_of_players>=1){
                 getGameInput(button_input_1, PLAYER_ONE_ID);
@@ -1177,7 +1244,19 @@ int main() {
             resetGameState();
             initMainMenu();
         }
+        else if (game_mode==MENU_LEAVE_CHARACTERS){
+            resetGameState();
+            game_mode=FIGHT_MODE;
+            printf("Leaving characters menu\n");
+            if (current_menu_selection==0){
+                player_1.character_id = CHARACTER_JUUL;
+            }
+            else{
+                player_1.character_id = CHARACTER_GULLEROD;
+            }
+        }
         else if (game_mode==MENU_LEAVE_MAIN){
+            printf ("Leaving main menu: %d, unlocked characters: %d\n", current_menu_selection, unlocked_characters);
             if (current_menu_selection==2){
                 initLanguageMenu();
             }
@@ -1188,10 +1267,18 @@ int main() {
                 game_mode=FIGHT_MODE;
             }
             else{
-                resetGameState();
-                amount_of_players = current_menu_selection+1;
-                printf("amount_of_players: %d\n", amount_of_players);
-                game_mode=FIGHT_MODE;
+                if ((unlocked_characters==0) || (current_menu_selection==1)){
+                    resetGameState();
+                    amount_of_players = current_menu_selection+1;
+                    printf("amount_of_players: %d\n", amount_of_players);
+                    game_mode=FIGHT_MODE;
+                    player_2.character_id = CHARACTER_JUUL;
+                }
+                else{
+                    resetGameState();
+                    initCharactersMenu();
+                    player_2.character_id = CHARACTER_JUUL;
+                }
             }
         }
         button_filter=debounceInputs(button_input_1|button_input_2);

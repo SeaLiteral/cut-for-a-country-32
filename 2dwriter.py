@@ -1,6 +1,8 @@
 player_frames='stille-0 slag-0 slag-1 slag-2 slag-3 block-0 nede-0'.split()
 
-some_cols={}
+player_name='gullerod'
+
+some_cols={} # Juul
 some_cols['light red']=(0xba, 0x3e, 0x0c)
 some_cols['dark red']=(0x9d, 0x34, 0x0d)
 some_cols['light brown']=(0xb7, 0x9c, 0x42)
@@ -14,6 +16,21 @@ some_cols['dark jumper']=(0x8a, 0x6f, 0x71)
 some_cols['light shoe']=(0xa3, 0x85, 0x38)
 some_cols['dark shoe']=(0x9d, 0x6c, 0x67)
 some_cols['green']= (0x00, 0xff, 0x00)
+
+
+some_cols={} # Gullerod
+some_cols['light orange']=(0xf7, 0x58, 0x3d)
+some_cols['dark orange']= (0xe9, 0x55, 0x3b)
+some_cols['light gold']=(0xd8, 0xc5, 0x00)
+some_cols['dark gold']= (0xc0, 0xa9, 0x01)
+some_cols['green']=(0x31, 0xd8, 0x00)
+some_cols['black']=(0x4b, 0x3a, 0x45)
+some_cols['blue']=(0x00, 0x00, 0xff)
+some_cols['magenta']=(0xff, 0x00, 0xff)
+
+vert_counts=[]
+tri_counts=[]
+
 
 cols2names={}
 for col_name in some_cols:
@@ -54,9 +71,20 @@ def read_frame(frame_name, frame_id=None):
     counted_faces=0
 
 
-    player_1_replacements=[(some_cols['green'], some_cols['light red'])]
-    player_2_replacements=player_1_replacements+[(some_cols['light red'], some_cols['light jumper']), (some_cols['dark red'], some_cols['dark jumper']),
-                                                 (some_cols['light jumper'], some_cols['light red']), (some_cols['dark jumper'], some_cols['dark red'])]
+    if ('light jumper' in some_cols):
+        player_1_replacements=[(some_cols['green'],
+                                some_cols['light red'])]
+        player_2_replacements=player_1_replacements+[(some_cols['light red'],
+                                                      some_cols['light jumper']),
+                                                     (some_cols['dark red'],
+                                                      some_cols['dark jumper']),
+                                                     (some_cols['light jumper'],
+                                                      some_cols['light red']),
+                                                     (some_cols['dark jumper'],
+                                                      some_cols['dark red'])]
+    else:
+        player_1_replacements=[]
+        player_2_replacements=[]
 
     general_factor=50
 
@@ -180,7 +208,7 @@ def read_frame(frame_name, frame_id=None):
 
     new_verts=[]
     for i in range(len(verts['x'])):
-        new_x=verts['x'][i]
+        new_x=verts['x'][i]+120
         new_y=verts['y'][i]
         new_z=verts['z'][i]
         new_col=col_indices[i]
@@ -204,20 +232,21 @@ def read_frame(frame_name, frame_id=None):
         new_face=[old2new_verts[i] for i in face]
         new_faces.append(tuple(new_face))
     new_faces=sorted(new_faces)
+    print(min(new_x_values))
 
     output_c=''
 
     #print ('start x')
-    output_c+=('uint8_t player1verts_x'+
+    output_c+=('uint8_t '+player_name+'_verts_x'+
                frame_id+'[]={'+(str(new_x_values))[1:-1]+'};\n\n')
     #print ('end x\n\nstart y')
-    output_c+=('uint8_t player1verts_y'+
+    output_c+=('uint8_t '+player_name+'_verts_y'+
                frame_id+'[]={'+(str(new_y_values))[1:-1]+'};\n\n')
-    output_c+=('// uint8_t player1verts_z'+
+    output_c+=('// uint8_t '+player_name+'_verts_z'+
                frame_id+'[]={'+(str(new_z_values))[1:-1]+'};\n\n')
     #print ('end y\n\nstart red')
 
-    out_faces_c='uint8_t player_1_trirefs'+frame_id+'[]={'
+    out_faces_c='uint8_t '+player_name+'_trirefs'+frame_id+'[]={'
     line_tris=0
     triangle_separators=['\n','    ', '    ','    ']
     for i in new_faces:
@@ -228,20 +257,20 @@ def read_frame(frame_name, frame_id=None):
     out_faces_c=out_faces_c[:-1]+'\n};\n'
 
 
-    out_colrefs='uint8_t player_1_colrefs'+frame_id+'[]={\n'
+    out_colrefs='uint8_t '+player_name+'_colrefs'+frame_id+'[]={\n'
     out_colrefs+=', '.join([str(i) for i in new_col_values])
     out_colrefs+='\n};\n'
 
     out_palette=''
     ipal2=[maybeReplaceCol(i, player_1_replacements) for i in ipal]
     if frame_id=='_stille_0':
-        out_palette+='uint8_t player_1_red[]={'+(str([i[0] for i in ipal2])[1:-1])+'};\n\n'
-        out_palette+='uint8_t player_1_green[]={'+(str([i[1] for i in ipal2])[1:-1])+'};\n\n'
-        out_palette+='uint8_t player_1_blue[]={'+(str([i[2] for i in ipal2])[1:-1])+'};\n\n'
+        out_palette+='uint8_t '+player_name+'_red[]={'+(str([i[0] for i in ipal2])[1:-1])+'};\n\n'
+        out_palette+='uint8_t '+player_name+'_green[]={'+(str([i[1] for i in ipal2])[1:-1])+'};\n\n'
+        out_palette+='uint8_t '+player_name+'_blue[]={'+(str([i[2] for i in ipal2])[1:-1])+'};\n\n'
         ipal3=[maybeReplaceCol(i, player_2_replacements) for i in ipal]
-        out_palette+='uint8_t player_2_red[]={'+(str([i[0] for i in ipal3])[1:-1])+'};\n\n'
-        out_palette+='uint8_t player_2_green[]={'+(str([i[1] for i in ipal3])[1:-1])+'};\n\n'
-        out_palette+='uint8_t player_2_blue[]={'+(str([i[2] for i in ipal3])[1:-1])+'};\n\n'
+        out_palette+='uint8_t '+player_name+'_2_red[]={'+(str([i[0] for i in ipal3])[1:-1])+'};\n\n'
+        out_palette+='uint8_t '+player_name+'_2_green[]={'+(str([i[1] for i in ipal3])[1:-1])+'};\n\n'
+        out_palette+='uint8_t '+player_name+'_2_blue[]={'+(str([i[2] for i in ipal3])[1:-1])+'};\n\n'
 
     #print(output_c)
     #print(out_faces_c)
@@ -263,8 +292,10 @@ def read_frame(frame_name, frame_id=None):
         prev_col=col
 
 
-    lengths_out=('int player_1_vert_count'+frame_id+'='+str(len(verts['x']))+
-                 ';\nint player_1_tri_count'+frame_id+'='+str(len(faces))+';')
+    lengths_out=('int '+player_name+'_vert_count'+frame_id+'='+str(len(verts['x']))+
+                 ';\nint '+player_name+'_tri_count'+frame_id+'='+str(len(faces))+';')
+    vert_counts.append(len(verts['x']))
+    tri_counts.append(len(faces))
 
     frame_description=frame_id + ': ' + frame_name + '\n\n'
     
@@ -277,6 +308,7 @@ def read_frame(frame_name, frame_id=None):
 if __name__=='__main__':
     frame_data_c=''
     for i in player_frames:
-        frame='juul/nisse-ske:'+i+'.ply'
+        #frame='juul/nisse-ske:'+i+'.ply'
+        frame='gullerod/gullerod:'+i+'.ply'
         frame_data_c+=read_frame(frame)[0]
     print(frame_data_c)
