@@ -60,4 +60,6 @@ A bunch of things:
 - Port the game to more platforms.
 
 ## Credits
+I'm making this game myself, writing the text in the three languages I speak reasonably well.
+
 I'm using PSn00bSDK, which is under the Mozilla Public Licence and can be found on <https://github.com/Lameguy64/PSn00bSDK>.

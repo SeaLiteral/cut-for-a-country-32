@@ -1,12 +1,11 @@
 /*
  * Cut for a Country: a homebrew fighting game for the PS1
  * using PSn00bSDK.
- * TODO: put each player into a structure
- * so that I can use the same code on both structures,
- * rather than having repeated code all over the place.
- * Also, I need to add more attacks, more characters,
- * and implement combos and stop the players
- * from walking through each other.
+ * TODO:
+ * - Add more attacks, more characters,
+ *   and implement combos and stop the players
+ *   from walking through each other.
+ * - Add cutscenes not based on text.
  */
 
 #include <sys/types.h>
@@ -18,9 +17,11 @@
 #include <stdio.h>
 
 #include "colour-names.h"
+#include "main.h"
+
 #define PLAYER_VERTS_COUNT 255 // so that each vertex index fits in a byte
                                // (lowers eyebrows in doubt as I write
-                               // that comment above.
+                               // that comment above)
 
 #define PLAYER_MAX_HEALTH 20   // that's four punches
 #define PLAYER_ONE_ID 0
@@ -48,39 +49,12 @@ const int Video_Mode = MODE_PAL;
 const int Video_Mode = MODE_NTSC;
 #endif
 
-#define OTLENGTH 32768 // Size of the ordering table
 
-#define RANDOM_STATE_SIZE 7
+//#define RANDOM_STATE_SIZE 7 // Change in main.h
 int pseudoRandomState[RANDOM_STATE_SIZE]={3141592, 65358979, 32384626, 43383279, 50288419, 71693993, 75105820};
 uint16_t pseudoRandomStep=0;
 
-// functions
-void initDisplay();
-void swapBuffers();
-void loadFont();
-void getGameInput(uint16_t button_input, uint16_t player_id);
-void resetGameState();
-uint16_t debounceInputs(uint16_t button_input); // FIXME: move this into the players
-void getResultScreenInput(uint16_t button_input);
-void drawPlayer(int playerNum);
-void drawHealth();
-void handleHits();
-void setPlayer1Frame(int f);
-void drawText(unsigned char *text, int textY);
-int main();
-
-
-enum Game_Modes {
-    LANGUAGE_MENU,
-    MAIN_MENU,
-    CHARACTERS_MENU,
-    SHOW_RESULT,
-    MENU_LEAVE_LANGUAGES,
-    MENU_LEAVE_MAIN,
-    MENU_LEAVE_CHARACTERS,
-    FIGHT_MODE,
-    AMOUNT_OF_GAME_MODES,
-} game_mode=FIGHT_MODE;
+enum Game_Modes  game_mode;
 int exit_from_mode[AMOUNT_OF_GAME_MODES];
 int amount_of_players=2;
 
@@ -100,44 +74,10 @@ char *next_prim;
 // FIXME: animations are player specific in a different way,
 //        but that's something I gotta fix in another file first.
 
-typedef struct ai{
-    int16_t dodge;
-    int16_t dodge_wait;
-    int16_t attack_wait;
-} AI;
-
-
-typedef struct player_mesh{
-    uint8_t *verts_x;
-    uint8_t *verts_y;
-    uint8_t *colrefs;
-    uint8_t *trirefs;
-    int vert_count;
-    int tri_count;
-} Player_Mesh;
 
 // FIXME: This could use an enum
 #define CHARACTER_JUUL 0
 #define CHARACTER_GULLEROD 1
-
-typedef struct player{
-    int raw_x;
-    int raw_y;
-    int pixel_x;
-    int pixel_y;
-    int speed_x;
-    int speed_y;
-    int16_t hit;
-    int16_t health;
-    int frame;
-    int16_t dash_state;
-    int16_t punch_state;
-    int16_t character_id;
-    AI ai;
-    Player_Mesh mesh;
-} Player;
-
-
 
 Player player_1, player_2;
 
@@ -159,12 +99,6 @@ u_char controller_buffers[2][34];
 extern u_long font_texture_tim_data[];
 TIM_IMAGE font_texture;
 
-//                            0    5   10   15   20   25   30   35   40   45   50   55   60   65   70   75   80
-//                            0                 19                37            51    57               74
-//unsigned char all_texts_da[]="$SPILLER 1 VANDT$  SPILLER 2 VANDT$  DET BLEV LIGE$DANSK$ENGLISH$ESPAN~OL$1 SPILLER$2 SPILLERE$ SPROG$  $DEMONSTRATION";
-//unsigned char all_texts_en[]="$PLAYER 1 WINS$    PLAYER 2 WINS$    PLAYERS TIED$ DANSK$ENGLISH$ESPAN~OL$1 PLAYER$ 2 PLAYERS$  LANGUAGE$DEMO";
-//unsigned char all_texts_es[]="$GANA EL JUGADOR 1$GANA EL JUGADOR 2$EMPATE$       DANSK$ENGLISH$ESPAN~OL$1 JUGADOR$2 JUGADORES$IDIOMA$ $DEMONSTRACIO[N";
-
 #include "build-tr/ui_ps1.h"
 // TODO: create translation_data from translation_contents
 
@@ -175,9 +109,11 @@ int current_language=1; // English
 
 int show_text=UI_EMPTY_STRING;
 #define MENU_MAX_OPTIONS 4
-int menu_full[MENU_MAX_OPTIONS];
-int current_menu_options = 0;
-int current_menu_selection=0;
+int menu_texts[MENU_MAX_OPTIONS];
+void (*menu_exit_fun[MENU_MAX_OPTIONS])(int, int);
+int current_menu_options;
+int current_menu_selection;
+int previous_menu_selection;
 
 
 // #include "player_1_xyc.h"
@@ -248,39 +184,72 @@ void initModes(){
     exit_from_mode[SHOW_RESULT]=FIGHT_MODE;
     exit_from_mode[MENU_LEAVE_LANGUAGES]=FIGHT_MODE;
     exit_from_mode[MENU_LEAVE_MAIN]=FIGHT_MODE;
+    exit_from_mode[OPTIONS_MENU]=MENU_LEAVE_OPTIONS;
 }
 
 void initMenu(int selection){
     current_menu_selection = selection;
+    previous_menu_selection= selection;
     current_menu_options=0;
     for (int i=0;i<MENU_MAX_OPTIONS;i++){
-        menu_full[i] = UI_EMPTY_STRING;
+        menu_texts[i] = UI_EMPTY_STRING;
     }
-    current_screen_time++;
+    current_screen_time=0;
 }
 
 int addMenuOption(int string_id){
    if (current_menu_options>=MENU_MAX_OPTIONS){
        return 1;
    }
-   menu_full[current_menu_options] = string_id;
+   menu_texts[current_menu_options] = string_id;
+   menu_exit_fun[current_menu_options] = NULL;
    current_menu_options++;
    return 0;
 }
 
+int addMenuOptionWithFun(int string_id, void (*option_action)(int, int) ){
+   if (current_menu_options>=MENU_MAX_OPTIONS){
+       return 1;
+   }
+   menu_texts[current_menu_options] = string_id;
+   menu_exit_fun[current_menu_options] = option_action;
+   current_menu_options++;
+   return 0;
+}
+
+void setLanguage(int lang, int action){
+    current_language = lang;
+    if (action==1){
+        printf ("Language got set: %d!\n", lang);
+        initMainMenu();
+        return;
+    }
+    if (action==-1){
+        current_language = previous_menu_selection;
+    }
+}
+
 void initLanguageMenu(){
-    initMenu(1);
-    addMenuOption (UI_LANG_DA);
-    addMenuOption (UI_LANG_EN);
-    addMenuOption (UI_LANG_ES);
+    initMenu(current_language);
+    addMenuOptionWithFun (UI_LANG_DA, setLanguage);
+    addMenuOptionWithFun (UI_LANG_EN, setLanguage);
+    addMenuOptionWithFun (UI_LANG_ES, setLanguage);
     game_mode = LANGUAGE_MENU;
+}
+
+void initOptionsMenu(){
+    initMenu(0);
+    printf ("Showing options menu\n");
+    addMenuOptionWithFun (UI_OM_LANGUAGE, maybeInitLanguageMenu);
+    addMenuOptionWithFun (UI_OM_BACK, maybeInitMainMenu);
+    game_mode = OPTIONS_MENU;
 }
 
 void initMainMenu(){
     initMenu(amount_of_players-1);
-    addMenuOption (UI_MM_1_PLAYER);
-    addMenuOption (UI_MM_2_PLAYERS);
-    addMenuOption (UI_OM_LANGUAGE);
+    addMenuOptionWithFun (UI_MM_1_PLAYER, maybeSetPlayerAmount);
+    addMenuOptionWithFun (UI_MM_2_PLAYERS, maybeSetPlayerAmount);
+    addMenuOptionWithFun (UI_MM_OPTIONS, maybeInitOptionsMenu);
     current_screen_time = 0;
     // addMenuOption (UI_MM_TEST);
     game_mode = MAIN_MENU;
@@ -289,14 +258,77 @@ void initMainMenu(){
     }
 }
 
+void maybeSetPlayerAmount(int menu_sel, int action){
+    amount_of_players = menu_sel+1;
+    if (action==1){
+        printf ("Action: prepare game: %d!\n", menu_sel);
+        resetGameState();
+        if ((amount_of_players==1) && (unlocked_characters>=1)){
+            initCharactersMenu();
+        }
+        else{
+            game_mode = FIGHT_MODE;
+        }
+    }
+}
+
+void maybeResetGame(int nothing, int action){
+    if (action==1){
+        printf ("Action: reset game: %d!\n", nothing);
+        resetGameState();
+    }
+}
+
+void maybeInitMainMenu(int nothing, int action){
+    //printf("Main menu highlighted\n");
+    if (action==1){
+        printf ("Action: init main menu\n");
+        initMainMenu();
+    }
+}
+
+void maybeInitOptionsMenu(int nothing, int action){
+    //printf("Main menu highlighted\n");
+    if (action==1){
+        printf ("Action: init options menu\n");
+        initOptionsMenu();
+        return;
+    }
+    if (action==-1){
+        printf ("Cancelled going to options menu\n");
+        initMainMenu();
+    }
+}
+
+void maybeInitLanguageMenu(int nothing, int action){
+    //printf("Language menu highlighted\n");
+    if (action==1){
+        printf ("Action: init language menu\n");
+        initLanguageMenu();
+    }
+}
+
 void initCharactersMenu(){
     initMenu(0);
     printf("Entering characters menu\n");
-    addMenuOption (UI_CH_JUUL_NAME);
-    addMenuOption (UI_CH_GULLEROD_NAME);
+    addMenuOptionWithFun (UI_CH_JUUL_NAME, setCharacter);
+    addMenuOptionWithFun (UI_CH_GULLEROD_NAME, setCharacter);
     game_mode = CHARACTERS_MENU;
     if (amount_of_players==0){
         current_menu_selection = 3;
+    }
+}
+
+void setCharacter(int character, int action){
+    player_1.character_id = character;
+    if (action==1){
+        printf ("Chose character: %d!\n", character);
+        resetGameState();
+        game_mode = FIGHT_MODE;
+        return;
+    }
+    if (action==-1){
+        //current_language = previous_menu_selection;
     }
 }
 
@@ -395,7 +427,7 @@ void swapBuffers() {
         VSync(0);
         new_frame=VSync(-1);
     }
-    while (new_frame==current_frame);
+    while ((new_frame|1)==(current_frame|1));
     current_frame=new_frame;
 
     PutDispEnv(&dispenvs[currentBuffer]);
@@ -406,7 +438,6 @@ void swapBuffers() {
     DrawOTag(orderingTables[currentBuffer]+OTLENGTH-1);
     currentBuffer = !currentBuffer;
     next_prim = primBuff[currentBuffer];
-    
 }
 
 
@@ -537,7 +568,7 @@ void resetGameState(){
     // stuff shared by both players
     player->health = PLAYER_MAX_HEALTH;
     
-    player->raw_y = 64*256;
+    player->raw_y = 112*256;
     player->pixel_y=player->raw_y*player_scale_y/256/16;
     player->speed_x = 0;
     player->speed_y = 0;
@@ -689,25 +720,35 @@ void getResultScreenInput(uint16_t button_input){
 void getMenuInput(uint16_t button_input){
     if ((button_input & PAD_CROSS) && (cross_was_pressed <= 0)){
         game_mode = exit_from_mode[game_mode];
+        if (menu_exit_fun[current_menu_selection]!=NULL){
+            menu_exit_fun[current_menu_selection] (current_menu_selection, 1);
+        }
+        else{
+            printf("Menu item without a callback function: %d in menu %d ", current_menu_selection, game_mode);
+        }
     }
     if ((button_input & PAD_DOWN) && (down_was_pressed <= 0)){
         current_menu_selection++;
         if (current_menu_selection>=current_menu_options){
             current_menu_selection=0;
         }
-        //printf("menu selection: %d\n", current_menu_selection);
+        if (menu_exit_fun[current_menu_selection]!=NULL){
+            menu_exit_fun[current_menu_selection] (current_menu_selection, 0);
+        }
     }
     if ((button_input & PAD_UP) && (up_was_pressed <= 0)){
         current_menu_selection--;
         if (current_menu_selection<0){
             current_menu_selection=current_menu_options-1;
         }
-        //printf("menu selection: %d\n", current_menu_selection);
+        if (menu_exit_fun[current_menu_selection]!=NULL){
+            menu_exit_fun[current_menu_selection] (current_menu_selection, 0);
+        }
     }
 }
 
 void getAttractInput(uint16_t button_input){
-    if (button_input){
+    if (button_input&PAD_START){ // Is this how we should be checking it
         initMainMenu();
     }
 }
@@ -919,8 +960,8 @@ void getGameInput(uint16_t button_input, uint16_t player_id){
         
         player->speed_y+=FRAME_MULTIPLIER*3;
         player->raw_y+=player->speed_y;
-        if (player->raw_y>=(176-64)*256){
-            player->raw_y=(176-64)*256;
+        if (player->raw_y>=112*256){
+            player->raw_y=112*256;
             player->speed_y=0;
             if (move_y<0){
                 player->speed_y=(0-150)*FRAME_MULTIPLIER;
@@ -997,11 +1038,11 @@ void handleHits(){
     if ((player_2.frame==4) &&
          (
               (
-                  (player_1.raw_x-player_2.raw_x < 81920-73684) &&
+                  (player_1.raw_x-player_2.raw_x < 8200) &&
                   (player_1.raw_x>player_2.raw_x)
               ) ||
               (
-                  (player_2.raw_x-player_1.raw_x < 81920-73684) &&
+                  (player_2.raw_x-player_1.raw_x < 8200) &&
                   (player_1.raw_x<player_2.raw_x)
               )
          ) &&
@@ -1045,12 +1086,14 @@ void handleHits(){
         if ((player_2.character_id==CHARACTER_GULLEROD)&&
             (unlocked_characters<1)){
             unlocked_characters=1;
+        }
+        if (player_2.character_id==CHARACTER_GULLEROD){
             won_last_fight = 1;
             show_text=UI_SM_BEAT_GULLEROD;
         }
     }
     if (game_mode==SHOW_RESULT && amount_of_players==0){
-        show_text = UI_AT_PRESS_SOMETHING;
+        show_text = UI_AT_PRESS_START;
     }
 }
 
@@ -1149,7 +1192,7 @@ void drawMenu(){
         language_text = &(language_text[language_size*current_language]);
         
         //char test_text[]="TEST";
-        drawText (&(language_text[menu_full[item]]), vPos+25);
+        drawText (&(language_text[menu_texts[item]]), vPos+25);
         vPos+=35;
     }
     if(current_menu_selection<current_menu_options){
@@ -1192,14 +1235,20 @@ int main() {
         }
         
         
-        if ((game_mode==LANGUAGE_MENU) || (game_mode==MAIN_MENU) || (game_mode==CHARACTERS_MENU)){
+        if ((game_mode==LANGUAGE_MENU) || (game_mode==MAIN_MENU) ||
+            (game_mode==CHARACTERS_MENU)||(game_mode==OPTIONS_MENU) ){
             getMenuInput(button_input_1|button_input_2);
             drawMenu();
             if (current_screen_time > FIFTH_OF_A_SECOND*5*20){
                 resetGameState();
-                amount_of_players = 0;
-                game_mode=FIGHT_MODE;
-        }
+                if (game_mode!=CHARACTERS_MENU){
+                    amount_of_players = 0;
+                    game_mode=FIGHT_MODE;
+                }
+                else{
+                    game_mode = MENU_LEAVE_CHARACTERS;
+                }
+            }
         }
         else if (game_mode==SHOW_RESULT){
             if(show_text != UI_EMPTY_STRING){
@@ -1221,7 +1270,7 @@ int main() {
                 if((current_screen_time%(FIFTH_OF_A_SECOND*50))<30){
                     char *language_text = &translation_contents;
                     language_text = &(language_text[language_size*current_language]);
-                    drawText (&(language_text[UI_AT_PRESS_SOMETHING]), 25);
+                    drawText (&(language_text[UI_AT_PRESS_START]), 25);
                 }
             }
             if (amount_of_players>=1){
@@ -1238,48 +1287,6 @@ int main() {
             }
             handleHits();
             drawHealth();
-        }
-        if (game_mode==MENU_LEAVE_LANGUAGES){
-            current_language=current_menu_selection;
-            resetGameState();
-            initMainMenu();
-        }
-        else if (game_mode==MENU_LEAVE_CHARACTERS){
-            resetGameState();
-            game_mode=FIGHT_MODE;
-            printf("Leaving characters menu\n");
-            if (current_menu_selection==0){
-                player_1.character_id = CHARACTER_JUUL;
-            }
-            else{
-                player_1.character_id = CHARACTER_GULLEROD;
-            }
-        }
-        else if (game_mode==MENU_LEAVE_MAIN){
-            printf ("Leaving main menu: %d, unlocked characters: %d\n", current_menu_selection, unlocked_characters);
-            if (current_menu_selection==2){
-                initLanguageMenu();
-            }
-            else if (current_menu_selection == 3){
-                resetGameState();
-                amount_of_players = 0;
-                printf("amount_of_players: %d\n", amount_of_players);
-                game_mode=FIGHT_MODE;
-            }
-            else{
-                if ((unlocked_characters==0) || (current_menu_selection==1)){
-                    resetGameState();
-                    amount_of_players = current_menu_selection+1;
-                    printf("amount_of_players: %d\n", amount_of_players);
-                    game_mode=FIGHT_MODE;
-                    player_2.character_id = CHARACTER_JUUL;
-                }
-                else{
-                    resetGameState();
-                    initCharactersMenu();
-                    player_2.character_id = CHARACTER_JUUL;
-                }
-            }
         }
         button_filter=debounceInputs(button_input_1|button_input_2);
         

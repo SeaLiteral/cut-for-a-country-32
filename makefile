@@ -44,10 +44,10 @@ INCLUDE	+=
 LIBDIRS	+=
 LIBS	+=
 
-CFLAGS_NTSC = $(CFLAGS_EXE)
-CFLAGS_PAL = $(CFLAGS_EXE) -D MODE_IS_PAL
-CPPFLAGS_NTSC = $(CPPFLAGS_EXE)
-CPPFLAGS_PAL = $(CPPFLAGS_EXE) -D MODE_IS_PAL
+CFLAGS_NTSC = $(PSNOOB_CFLAGS_EXE)
+CFLAGS_PAL = $(PSNOOB_CFLAGS_EXE) -D MODE_IS_PAL
+CPPFLAGS_NTSC = $(PSNOOB_CPPFLAGS_EXE)
+CPPFLAGS_PAL = $(PSNOOB_CPPFLAGS_EXE) -D MODE_IS_PAL
 
 ## build rules
 
@@ -68,13 +68,13 @@ buildp/$(TARGETP).iso: buildp/$(TARGETP).exe
 
 buildn/$(TARGETN).elf: $(OFILESN) buildn/ui_ps1.o
 	@mkdir -p $(dir $@)
-	$(LD) $(LDFLAGS_EXE) $(LIBDIRS) $^ $(LIBS) -o $@
-	$(NM) -f posix -l -n $@ >$@.map
+	$(PSNOOB_LD) $(PSNOOB_LDFLAGS_EXE) $(PSNOOB_LIBDIRS) $^ $(PSNOOB_LIBS) -o $@
+	$(PSNOOB_NM) -f posix -l -n $@ >$@.map
 
 buildp/$(TARGETP).elf: $(OFILESP) buildp/ui_ps1.o
 	@mkdir -p $(dir $@)
-	$(LD) $(LDFLAGS_EXE) $(LIBDIRS) $^ $(LIBS) -o $@
-	$(NM) -f posix -l -n $@ >$@.map
+	$(PSNOOB_LD) $(PSNOOB_LDFLAGS_EXE) $(PSNOOB_LIBDIRS) $^ $(PSNOOB_LIBS) -o $@
+	$(PSNOOB_NM) -f posix -l -n $@ >$@.map
 
 
 
@@ -88,11 +88,19 @@ buildp/$(TARGETP).exe: buildp/$(TARGETP).elf
 
 buildn/main.o: main.c build-tr/ui_ps1.h
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS_NTSC) $(INCLUDE) -c main.c -o buildn/main.o
+	$(PSNOOB_CC) $(CFLAGS_NTSC) $(PSNOOB_INCLUDE) -c main.c -o buildn/main.o
 
 buildp/main.o: main.c build-tr/ui_ps1.h
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS_PAL) $(INCLUDE) -c main.c -o buildp/main.o
+	$(PSNOOB_CC) $(CFLAGS_PAL) $(PSNOOB_INCLUDE) -c main.c -o buildp/main.o
+
+buildn/old_physics.o: old_physics.c
+	@mkdir -p $(dir $@)
+	$(PSNOOB_CC) $(CFLAGS_NTSC) $(PSNOOB_INCLUDE) -c old_physics.c -o buildn/old_physics.o
+
+buildp/old_physics.o: old_physics.c
+	@mkdir -p $(dir $@)
+	$(PSNOOB_CC) $(CFLAGS_PAL) $(PSNOOB_INCLUDE) -c old_physics.c -o buildp/old_physics.o
 
 build-tr/ui_ps1.bin build-tr/ui_ps1.h build-tr/ui_ps1.s: translations/interface.ini
 	@mkdir -p $(dir $@)
@@ -100,30 +108,30 @@ build-tr/ui_ps1.bin build-tr/ui_ps1.h build-tr/ui_ps1.s: translations/interface.
 
 buildn/ui_ps1.o: build-tr/ui_ps1.s
 	@mkdir -p $(dir $@)
-	$(CC) $(AFLAGS_EXE) $(INCLUDE) -c $< -o $@
+	$(PSNOOB_CC) $(PSNOOB_AFLAGS_EXE) $(PSNOOB_INCLUDE) -c $< -o $@
 
 buildp/ui_ps1.o: build-tr/ui_ps1.s
 	@mkdir -p $(dir $@)
-	$(CC) $(AFLAGS_EXE) $(INCLUDE) -c $< -o $@
+	$(PSNOOB_CC) $(PSNOOB_AFLAGS_EXE) $(PSNOOB_INCLUDE) -c $< -o $@
 
 buildn/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS_NTSC) $(INCLUDE) -c $< -o $@
+	$(PSNOOB_CXX) $(CPPFLAGS_NTSC) $(PSNOOB_INCLUDE) -c $< -o $@
 # In the PAL version, we might want some differences
 buildp/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS_PAL) $(INCLUDE) -c $< -o $@
+	$(PSNOOB_CXX) $(CPPFLAGS_PAL) $(PSNOOB_INCLUDE) -c $< -o $@
 
 
 
 
 buildn/%.o: %.s
 	@mkdir -p $(dir $@)
-	$(CC) $(AFLAGS_EXE) $(INCLUDE) -c $< -o $@
+	$(PSNOOB_CC) $(PSNOOB_AFLAGS_EXE) $(PSNOOB_INCLUDE) -c $< -o $@
 
 buildp/%.o: %.s
 	@mkdir -p $(dir $@)
-	$(CC) $(AFLAGS_EXE) $(INCLUDE) -c $< -o $@
+	$(PSNOOB_CC) $(PSNOOB_AFLAGS_EXE) $(PSNOOB_INCLUDE) -c $< -o $@
 
 
 
