@@ -168,6 +168,8 @@ def read_frame(frame_name, frame_id=None):
                 prop_type=vert_props_raw[n][1]
                 if prop_type=='float':
                     new_value=round(float(raw_value)*general_factor)
+                    if prop_name=='z':
+                        new_value=round(float(raw_value)*60)
                 else:
                     new_value=int(raw_value)
                 if prop_name not in icats:

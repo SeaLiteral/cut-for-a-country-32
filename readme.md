@@ -15,7 +15,7 @@ Controls after a battle:
 - Select to change the text language.
 
 ## Story
-Carrot, the King of the Cuts, has decided to make a fighting competition, and whoever wins will get to rule the country. To make sure as many people has possible have the ability to participate, he's declared national holidays for a week, which should be enough time for everyone who wants to fight in the competition.
+Carrot, the King of the Cuts, is a bit tired of ruling, and has decided to make a fighting competition, and whoever wins will get to rule the country. To make sure as many people has possible have the ability to participate, he's declared national holidays for a week, which should be enough time for everyone who wants to fight in the competition.
 
 ## Characters
 There's currently two characters in the game:
@@ -25,14 +25,16 @@ There's currently two characters in the game:
 Other characters I've thought of adding:
 - A vampire whose favourite holiday is Halloween. He might distinguish between signed and unsigned bites.
 - An Easter egg that cares about bite order.
-- The elf's pet.
-- A bee.
+- The elf's pet: a cat that reads a lot.
+- A witch that's tired of anti-witchcraft laws in the country and wants to change them.
 
 ## Known issues
 
-Known issues (post-jam versions):
+Known issues (current version):
 - You can crouch in mid-air: if you press up, then hold triangle before you land, you'll be crouching/blocking in mid-air. I guess some might consider that a feature rather than a bug, but I think what you can do in mid-air shouldn't be the same as what you can do on the ground, and the way this happens it also turns off gravity until you release the triangle button.
 - There are problems, apparently in libpsn00b's GPU-related assembly code, that can cause the game to show wrong in no$psx and possibly other emulators. This is why I ony included an NTSC build, and these problems are still present in post-jam builds.
+- The carrot animation looks weird when dodging.
+- Some animations that exist in the game data don't actually get used in the game.
 
 
 Known issues (jam version):
@@ -63,3 +65,5 @@ A bunch of things:
 I'm making this game myself, writing the text in the three languages I speak reasonably well.
 
 I'm using PSn00bSDK, which is under the Mozilla Public Licence and can be found on <https://github.com/Lameguy64/PSn00bSDK>.
+
+I first made this game for the 32-bit Holiday Jam in 2021, then made some post-jam edits in January 2022. Then added a background "image" made of three rectangles during the 32-bit Spring Cleaning Jam in 2022, where I also made some animations that I didn't have time to actually make the game display.
