@@ -1,6 +1,9 @@
 player_frames='stille-0 slag-0 slag-1 slag-2 slag-3 block-0 nede-0'.split()
 
-player_name='gullerod'
+player_name='juul'
+player_name2 = player_name
+if player_name=='juul':
+    player_name2='nisse-ske'
 
 some_cols={} # Juul
 some_cols['light red']=(0xba, 0x3e, 0x0c)
@@ -17,16 +20,16 @@ some_cols['light shoe']=(0xa3, 0x85, 0x38)
 some_cols['dark shoe']=(0x9d, 0x6c, 0x67)
 some_cols['green']= (0x00, 0xff, 0x00)
 
-
-some_cols={} # Gullerod
-some_cols['light orange']=(0xf7, 0x58, 0x3d)
-some_cols['dark orange']= (0xe9, 0x55, 0x3b)
-some_cols['light gold']=(0xd8, 0xc5, 0x00)
-some_cols['dark gold']= (0xc0, 0xa9, 0x01)
-some_cols['green']=(0x31, 0xd8, 0x00)
-some_cols['black']=(0x4b, 0x3a, 0x45)
-some_cols['blue']=(0x00, 0x00, 0xff)
-some_cols['magenta']=(0xff, 0x00, 0xff)
+if (0):
+    some_cols={} # Gullerod
+    some_cols['light orange']=(0xf7, 0x58, 0x3d)
+    some_cols['dark orange']= (0xe9, 0x55, 0x3b)
+    some_cols['light gold']=(0xd8, 0xc5, 0x00)
+    some_cols['dark gold']= (0xc0, 0xa9, 0x01)
+    some_cols['green']=(0x31, 0xd8, 0x00)
+    some_cols['black']=(0x4b, 0x3a, 0x45)
+    some_cols['blue']=(0x00, 0x00, 0xff)
+    some_cols['magenta']=(0xff, 0x00, 0xff)
 
 vert_counts=[]
 tri_counts=[]
@@ -86,7 +89,9 @@ def read_frame(frame_name, frame_id=None):
         player_1_replacements=[]
         player_2_replacements=[]
 
-    general_factor=50
+    general_factor=40
+    if 'gullerod' in frame_id:
+        general_factor = 50
 
     cats=[('colour', ('red','green','blue'))]
     icats={}
@@ -208,7 +213,7 @@ def read_frame(frame_name, frame_id=None):
 
     new_verts=[]
     for i in range(len(verts['x'])):
-        new_x=verts['x'][i]+120
+        new_x=verts['x'][i]
         new_y=verts['y'][i]
         new_z=verts['z'][i]
         new_col=col_indices[i]
@@ -232,7 +237,7 @@ def read_frame(frame_name, frame_id=None):
         new_face=[old2new_verts[i] for i in face]
         new_faces.append(tuple(new_face))
     new_faces=sorted(new_faces)
-    print(min(new_x_values))
+    #print(min(new_x_values))
 
     output_c=''
 
@@ -263,7 +268,7 @@ def read_frame(frame_name, frame_id=None):
 
     out_palette=''
     ipal2=[maybeReplaceCol(i, player_1_replacements) for i in ipal]
-    if frame_id=='_stille_0':
+    if 'stille-0' in frame_name:#frame_id=='_stille_0':
         out_palette+='uint8_t '+player_name+'_red[]={'+(str([i[0] for i in ipal2])[1:-1])+'};\n\n'
         out_palette+='uint8_t '+player_name+'_green[]={'+(str([i[1] for i in ipal2])[1:-1])+'};\n\n'
         out_palette+='uint8_t '+player_name+'_blue[]={'+(str([i[2] for i in ipal2])[1:-1])+'};\n\n'
@@ -271,6 +276,7 @@ def read_frame(frame_name, frame_id=None):
         out_palette+='uint8_t '+player_name+'_2_red[]={'+(str([i[0] for i in ipal3])[1:-1])+'};\n\n'
         out_palette+='uint8_t '+player_name+'_2_green[]={'+(str([i[1] for i in ipal3])[1:-1])+'};\n\n'
         out_palette+='uint8_t '+player_name+'_2_blue[]={'+(str([i[2] for i in ipal3])[1:-1])+'};\n\n'
+    print(frame_name)
 
     #print(output_c)
     #print(out_faces_c)
@@ -309,6 +315,7 @@ if __name__=='__main__':
     frame_data_c=''
     for i in player_frames:
         #frame='juul/nisse-ske:'+i+'.ply'
-        frame='gullerod/gullerod:'+i+'.ply'
+        frame=player_name+'/'+player_name2+':'+i+'.ply'
         frame_data_c+=read_frame(frame)[0]
-    print(frame_data_c)
+    #print(frame_data_c)
+    with open ('nisse-ske-c.h', 'w') as f: f.write(frame_data_c)

@@ -1,10 +1,14 @@
-uint8_t gullerod_red[] = {  0,  49, 192, 216, 233, 247, 255};
-uint8_t gullerod_green[]={  0, 216, 169, 197,  85,  88,   0};
-uint8_t gullerod_blue[]= {255,   0,   1,   0,  59,  61, 255};
+uint8_t gullerod_red[]={0, 49, 192, 216, 233, 247, 255};
 
-uint8_t gullerod_2_red[] = {  0,  49, 192, 216, 233, 247, 255};
-uint8_t gullerod_2_green[]={  0, 216, 169, 197,  85,  88,   0};
-uint8_t gullerod_2_blue[]= {255,   0,   1,   0,  59,  61, 255};
+uint8_t gullerod_green[]={0, 216, 169, 197, 85, 88, 0};
+
+uint8_t gullerod_blue[]={255, 0, 1, 0, 59, 61, 255};
+
+uint8_t gullerod_2_red[]={0, 49, 192, 216, 233, 247, 255};
+
+uint8_t gullerod_2_green[]={0, 216, 169, 197, 85, 88, 0};
+
+uint8_t gullerod_2_blue[]={255, 0, 1, 0, 59, 61, 255};
 
 // _stille_0: gullerod/gullerod-stille-0.ply
 
