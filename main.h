@@ -31,6 +31,9 @@ extern const int Video_Mode;
 extern int pseudoRandomState[RANDOM_STATE_SIZE];
 extern uint16_t pseudoRandomStep;
 
+#define ACTION_CONFIRM 1
+#define ACTION_CANCEL -1
+#define ACTION_HIGHLIGHT 0
 
 // 3D stuff
 extern VECTOR  model_position_in_world;

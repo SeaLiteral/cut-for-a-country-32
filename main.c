@@ -1,11 +1,19 @@
 /*
- * Cut for a Country: a homebrew fighting game for the PS1
- * using PSn00bSDK.
+ * Klipperne: a homebrew game engine for the PS1
+ * using PSn00bSDK. Currently the physics are only really
+ * useful for 2D fighting games.
  * TODO:
- * - Add more attacks, more characters,
- *   and implement combos and stop the players
- *   from walking through each other.
- * - Add cutscenes not based on text.
+ * - Fighting game: improve physics and animations,
+ *                  implement combos.
+ * - General: Add proper cutscene support.
+ * - Physics (general): add collission detection.
+ * The game is called "Cuts for a Country" because
+ *  it uses something that looks like cutout animation.
+ * The engine is called Klipperne which can mean
+ *  "the rocks" or "the cutters" (people who cut with
+ *  scissors or razors, such as those who cut off wool
+ *  from sheep) in Danish.
+ *
  */
 
 #include <sys/types.h>
@@ -112,11 +120,7 @@ extern u_long font_texture_tim_data[];
 TIM_IMAGE font_texture;
 
 #include "build-tr/ui_ps1.h"
-// TODO: create translation_data from translation_contents
 
-//unsigned char *language_text=all_texts_en;
-
-//unsigned char *language_pointers[3];
 int current_language=1; // English
 
 int show_text=UI_EMPTY_STRING;
@@ -232,12 +236,12 @@ int addMenuOptionWithFun(int string_id, void (*option_action)(int, int) ){
 
 void setLanguage(int lang, int action){
     current_language = lang;
-    if (action==1){
+    if (action==ACTION_CONFIRM){
         printf ("Language got set: %d!\n", lang);
         initMainMenu();
         return;
     }
-    if (action==-1){
+    if (action==ACTION_CANCEL){
         current_language = previous_menu_selection;
     }
 }
@@ -280,7 +284,7 @@ void initMainMenu(){
 
 void maybeSetPlayerAmount(int menu_sel, int action){
     amount_of_players = menu_sel+1;
-    if (action==1){
+    if (action==ACTION_CONFIRM){
         printf ("Action: prepare game: %d!\n", menu_sel);
         resetGameState();
         if ((amount_of_players==1) && (unlocked_characters>=1)){
@@ -301,7 +305,7 @@ void maybeResetGame(int nothing, int action){
 
 void maybeInitMainMenu(int nothing, int action){
     //printf("Main menu highlighted\n");
-    if (action==1){
+    if (action==ACTION_CONFIRM){
         printf ("Action: init main menu\n");
         initMainMenu();
     }
@@ -309,12 +313,12 @@ void maybeInitMainMenu(int nothing, int action){
 
 void maybeInitOptionsMenu(int nothing, int action){
     //printf("Main menu highlighted\n");
-    if (action==1){
+    if (action==ACTION_CONFIRM){
         printf ("Action: init options menu\n");
         initOptionsMenu();
         return;
     }
-    if (action==-1){
+    if (action==ACTION_CANCEL){
         printf ("Cancelled going to options menu\n");
         initMainMenu();
     }
@@ -322,13 +326,13 @@ void maybeInitOptionsMenu(int nothing, int action){
 
 void maybeInitTestMenu(int nothing, int action){
     //printf("Main menu highlighted\n");
-    if (action==1){
-        printf ("Action: init options menu\n");
+    if (action==ACTION_CONFIRM){
+        printf ("Action: init test menu\n");
         initTestMenu();
         return;
     }
-    if (action==-1){
-        printf ("Cancelled going to options menu\n");
+    if (action==ACTION_CANCEL){
+        printf ("Cancelled, exiting test menu\n");
         initMainMenu();
     }
 }
@@ -362,13 +366,13 @@ void setCharacter(int character, int action){
     if (character == CHARACTER_NISSE){
         player_1.mesh.height = 150;
     }
-    if (action==1){
+    if (action==ACTION_CONFIRM){
         printf ("Chose character: %d!\n", character);
         resetGameState();
         game_mode = FIGHT_MODE;
         return;
     }
-    if (action==-1){
+    if (action==ACTION_CANCEL){
         //current_language = previous_menu_selection;
     }
 }

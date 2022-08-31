@@ -1,6 +1,100 @@
-# Cuts for a Country
+# Klipperne
+A homebrew game engine for the PS1, made using PSn00bSDK and a fighting game made using the engine. The name "Klipperne" can mean "the people who cut threads/hair/wool/paper" or "the rocks" (as in mountains).
 
-A homebrew fighting game for the PS1, made using PSn00bSDK. 2D, with 2D graphics made of triangles. Mostly tested in DuckStation.
+## Text rendering
+Text should be stored in the `interface.ini` file and will get converted into a binary file when building the game. Here's some code from the example file:
+```
+# Language names: keep each language named in itself
+.lang_da "DANSK"
+.lang_en "ENGLISH"
+.lang_es "ESPAÑOL"
+```
+It lists the languages that the game is localized in. Each language is introduced with `.lang_xx` with xx replaced by a language code. Then there's a quoted string containing the name of the language in the language itself as it will appear on the language selection screen. Lines starting with a hash character are comments.
+
+The list of languages doesn't (yet) automatically get fetched by the language selection screen, so you'll need to edit it by hand. If it contains Danish, Spanish and English, it'll take this form:
+```c
+void initLanguageMenu(){
+    initMenu(current_language);
+    addMenuOptionWithFun (UI_LANG_DA, setLanguage);
+    addMenuOptionWithFun (UI_LANG_EN, setLanguage);
+    addMenuOptionWithFun (UI_LANG_ES, setLanguage);
+    game_mode = LANGUAGE_MENU;
+}
+```
+The `addMenuOptionWithFun` function will be explained later, but to add and remove languages you'd add and remove calls to that function from `initLanguageMenu`. As you can see, `.lang_da` becomes `UI_LANG_DA` and so on. That's because the C code accesses string pointers either through defines or constants. The current version of the engine uses defines, but I might change it if I find that constants have some advantage.
+
+To display a string after a match in the fighting game, I use code like this:
+```
+show_text=UI_RE_WINNER_1; // Select the string to show
+game_mode = SHOW_RESULT; // Enter a mode where the text will stay on screen until the player presses a button.
+```
+
+To create a menu you usually do three things:
+- Call the `initMenu(selection)` function. The value of `selection` should be the amount of menu options shown before the option that would be highlighted by default.
+- Add each menu item using the function `int addMenuOptionWithFun(int string_id, void (*option_action)(int, int) )`. The string_id should be one of the defines/constants generated from the `interface.ini` file (so it would start with `UI_`, then an uppercased version of the string ID used in that file. The action should be a function that takes an `int` parameter and returns an `int` result. See below for how to implement an action function.
+- Set the `game_mode` to a menu mode, which might be specific for the menu you're creating (see "Menu modes" below).
+
+You can look at the language selection screen for an example.
+
+### Action functions
+The action function takes two arguments:
+- indicates which menu option is highlighted.
+
+Example:
+```c
+void setLanguage(int lang, int action){
+    current_language = lang;
+    if (action==ACTION_CONFIRM){
+        printf ("Language got set: %d!\n", lang);
+        initMainMenu();
+        return;
+    }
+    if (action==ACTION_CANCEL){
+        current_language = previous_menu_selection;
+    }
+}
+```
+The `previous_menu_selection` is the option that was highlighted by default. Because of this, pressing triangle while on the language selection menu without previously having selected a language leads to English being selected, even if another language was highlighted.
+
+### Menu modes
+There's conditional code in the mainloop that checks for whether to show a menu. The way it then shows a menu is:
+
+```
+getMenuInput(button_input_1|button_input_2);
+drawMenu();
+```
+`button_input_1` and `button_input_2` are the button inputs from player 1 and 2 respectively.
+
+### More about the `interface.ini` format
+The name of a string should be made of letters, numbers and underscores and it can't start with a number. Usually string IDs start with a code that indicate which "group" a string belongs to, for example main menu option labels start with `mm_`.
+
+Each string has its own "section" in the file, for example:
+```
+.mm_1_player
+da = "1 SPILLER"
+en = "SINGLE PLAYER"
+es = "1 JUGADOR"
+```
+The section starts with a line that starts with a dot and then the ID of a string. There might also be filters to conditionally include the string.
+
+Each other line in the section would start with a language code, then have an equal sign, then the string in that language.
+
+Here's an example of a filtered section:
+```
+.mm_exit ?pc|mobile
+da = "LUK"
+en = "EXIT"
+es = "SALIR"
+```
+This would mean that the "exit" string is only needed in PC or mobile builds of the game. That way the option won't be shown if the game is being built for a platform that doesn't have any of the properties "pc" or "mobile". For example, the string would be left out of an HTML5 port of the game. Note that building the game for platforms other than PS1 is currently not implemented, so there's not much use for filters.
+
+I'm aware that modern consoles are kinda PC-like in that games might need to have an exit option because now games are usually installed on the consoles and it has to be possible to exit a game without turning of or resetting the console. So maybe the filters for the exit option should work in a different way.
+
+## Random number generator
+The function `randomNumber` returns an unsigned 16-bit value. It uses a simple lagged Fibonacci generator, but that's still more random than most implementations of C's `rand` function. 
+
+# Cuts for a Country
+THe fighting game, 2D, with 2D graphics made of triangles. Mostly tested in DuckStation.
 
 ## Controls
 Controls in game:
@@ -19,7 +113,7 @@ Carrot, the King of the Cuts, is a bit tired of ruling, and has decided to make 
 
 ## Characters
 There's currently two characters in the game:
-- Juul, a Christmas elf/gnome who got tired of living in a farm, so now he wants a castle. His favourite holiday is Christmas.
+- Nissen, a Christmas elf/gnome who got tired of living in a farm, so now he wants a castle. His favourite holiday is Christmas.
 - Carrot, the King of the Cuts, who organizes the competition, but also participates in it somehow. Doesn't like Easter, because he's a carrot, and some Easter bunnies tend to eat those. He does need them to cut his hair though.
 
 Other characters I've thought of adding:
