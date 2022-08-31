@@ -1,6 +1,6 @@
 # Cuts for a Country
 
-A homebrew fighting game for the PS1, made using PSn00bSDK.
+A homebrew fighting game for the PS1, made using PSn00bSDK. 2D, with 2D graphics made of triangles. Mostly tested in DuckStation.
 
 ## Controls
 Controls in game:
@@ -60,6 +60,8 @@ A bunch of things:
 - Translate this file into Danish and Spanish.
 - Add a "manual" and some "box art".
 - Port the game to more platforms.
+- Improve the large font and probably add a smaller font for longer pieces of text.
+- Attempt to implement pixel-perfect hit detection and use that if it doesn't cause the framerate to drop or something.
 
 ## Credits
 I'm making this game myself, writing the text in the three languages I speak reasonably well.
@@ -67,3 +69,8 @@ I'm making this game myself, writing the text in the three languages I speak rea
 I'm using PSn00bSDK, which is under the Mozilla Public Licence and can be found on <https://github.com/Lameguy64/PSn00bSDK>.
 
 I first made this game for the 32-bit Holiday Jam in 2021, then made some post-jam edits in January 2022. Then added a background "image" made of three rectangles during the 32-bit Spring Cleaning Jam in 2022, where I also made some animations that I didn't have time to actually make the game display.
+
+Timeline:
+- December 2021 for the 32bit Holiday Jam: simple combat, two players only
+- January 2022: menus, single player mode, introduced the carrot character, added demo/attract mode.
+- May 2022 during the 32bit Spring Cleaning Jam: simplified the animation tool, made some animations I didn't have time to actually make the game trigger, made the endscreen mention that it unlocks the carrot character, added a simple background "image" made of three rectangles, hiding the bright one when there's text in front of it because otherwise it could make the text hard to read.

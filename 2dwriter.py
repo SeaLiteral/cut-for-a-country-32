@@ -1,11 +1,11 @@
 player_frames='stille-0 slag-0 slag-1 slag-2 slag-3 block-0 nede-0'.split()
 
-player_name='juul'
+player_name='nisse'
 player_name2 = player_name
-if player_name=='juul':
+if player_name=='nisse':
     player_name2='nisse-ske'
 
-some_cols={} # Juul
+some_cols={} # Nisse
 some_cols['light red']=(0xba, 0x3e, 0x0c)
 some_cols['dark red']=(0x9d, 0x34, 0x0d)
 some_cols['light brown']=(0xb7, 0x9c, 0x42)
@@ -316,7 +316,7 @@ def read_frame(frame_name, frame_id=None):
 if __name__=='__main__':
     frame_data_c=''
     for i in player_frames:
-        #frame='juul/nisse-ske:'+i+'.ply'
+        #frame='nisse/nisse-ske:'+i+'.ply'
         frame=player_name+'/'+player_name2+':'+i+'.ply'
         frame_data_c+=read_frame(frame)[0]
     #print(frame_data_c)

@@ -10,15 +10,27 @@
 
 #include <sys/types.h>
 #include <psxetc.h>
-//#include <psxgte.h>
+#include <psxgte.h>
 #include <psxgpu.h>
 #include <psxpad.h>
 #include <psxapi.h>
 #include <stdio.h>
+#include <inline_c.h>
 
 #include "colour-names.h"
 #include "main.h"
 
+// 3D stuff
+VECTOR  model_position_in_world = {0, 0, SCREEN_WIDTH*3};
+SVECTOR model_rotation = {0, 0, 0};
+
+VECTOR  world_position = {0, 0, 1024};
+SVECTOR world_rotation = {0, 0, 0};
+    
+MATRIX test_matrix;
+MATRIX scale_matrix;
+
+// graphics in general
 #define PLAYER_VERTS_COUNT 255 // so that each vertex index fits in a byte
                                // (lowers eyebrows in doubt as I write
                                // that comment above)
@@ -76,7 +88,7 @@ char *next_prim;
 
 
 // FIXME: This could use an enum
-#define CHARACTER_JUUL 0
+#define CHARACTER_NISSE 0
 #define CHARACTER_GULLEROD 1
 
 Player player_1, player_2;
@@ -118,35 +130,35 @@ int previous_menu_selection;
 
 // #include "player_1_xyc.h"
 #include "player_1_animations.h"
-// TODO: Rename "player_1" and "player1" to "juul" in animations
-char *juul_frames_x[]={juul_verts_x_stille_0,
-                       juul_verts_x_slag_0, juul_verts_x_slag_1,juul_verts_x_slag_2, juul_verts_x_slag_3, juul_verts_x_slag_3,
-                       juul_verts_x_block_0,
-                       juul_verts_x_nede_0
+// TODO: Rename "player_1" and "player1" to "nisse" in animations
+char *nisse_frames_x[]={nisse_verts_x_stille_0,
+                       nisse_verts_x_slag_0, nisse_verts_x_slag_1,nisse_verts_x_slag_2, nisse_verts_x_slag_3, nisse_verts_x_slag_3,
+                       nisse_verts_x_block_0,
+                       nisse_verts_x_nede_0
                        };
                        
-char *juul_frames_y[]={juul_verts_y_stille_0,
-                       juul_verts_y_slag_0, juul_verts_y_slag_1,juul_verts_y_slag_2, juul_verts_y_slag_3, juul_verts_y_slag_3,
-                       juul_verts_y_block_0,
-                       juul_verts_y_nede_0
+char *nisse_frames_y[]={nisse_verts_y_stille_0,
+                       nisse_verts_y_slag_0, nisse_verts_y_slag_1,nisse_verts_y_slag_2, nisse_verts_y_slag_3, nisse_verts_y_slag_3,
+                       nisse_verts_y_block_0,
+                       nisse_verts_y_nede_0
                        };
-char *juul_trirefs[]= {juul_trirefs_stille_0,
-                       juul_trirefs_slag_0, juul_trirefs_slag_1,juul_trirefs_slag_2, juul_trirefs_slag_3, juul_trirefs_slag_3,
-                       juul_trirefs_block_0,
-                       juul_trirefs_nede_0
+char *nisse_trirefs[]= {nisse_trirefs_stille_0,
+                       nisse_trirefs_slag_0, nisse_trirefs_slag_1,nisse_trirefs_slag_2, nisse_trirefs_slag_3, nisse_trirefs_slag_3,
+                       nisse_trirefs_block_0,
+                       nisse_trirefs_nede_0
                        };
-char *juul_colrefs[]={juul_colrefs_stille_0,
-                       juul_colrefs_slag_0, juul_colrefs_slag_1,juul_colrefs_slag_2, juul_colrefs_slag_3, juul_colrefs_slag_3,
-                       juul_colrefs_block_0,
-                       juul_colrefs_nede_0
+char *nisse_colrefs[]={nisse_colrefs_stille_0,
+                       nisse_colrefs_slag_0, nisse_colrefs_slag_1,nisse_colrefs_slag_2, nisse_colrefs_slag_3, nisse_colrefs_slag_3,
+                       nisse_colrefs_block_0,
+                       nisse_colrefs_nede_0
                        };
                        
-int juul_vert_counts[]={253,
+int nisse_vert_counts[]={253,
                        253, 253, 253, 253, 253,
                        249,
                        255
                        };
-int juul_tri_counts[]={251,
+int nisse_tri_counts[]={251,
                        251, 251, 251, 251, 251,
                        249,
                        225
@@ -185,6 +197,7 @@ void initModes(){
     exit_from_mode[MENU_LEAVE_LANGUAGES]=FIGHT_MODE;
     exit_from_mode[MENU_LEAVE_MAIN]=FIGHT_MODE;
     exit_from_mode[OPTIONS_MENU]=MENU_LEAVE_OPTIONS;
+    exit_from_mode[TEST_MENU]=MENU_LEAVE_TEST;
 }
 
 void initMenu(int selection){
@@ -245,13 +258,20 @@ void initOptionsMenu(){
     game_mode = OPTIONS_MENU;
 }
 
+void initTestMenu(){
+    initMenu(0);
+    printf ("Showing test menu\n");
+    addMenuOptionWithFun (UI_OM_BACK, maybeInitMainMenu);
+    game_mode = TEST_MENU;
+}
+
 void initMainMenu(){
     initMenu(amount_of_players-1);
     addMenuOptionWithFun (UI_MM_1_PLAYER, maybeSetPlayerAmount);
     addMenuOptionWithFun (UI_MM_2_PLAYERS, maybeSetPlayerAmount);
     addMenuOptionWithFun (UI_MM_OPTIONS, maybeInitOptionsMenu);
+    addMenuOptionWithFun (UI_MM_TEST, maybeInitTestMenu);
     current_screen_time = 0;
-    // addMenuOption (UI_MM_TEST);
     game_mode = MAIN_MENU;
     if (amount_of_players==0){
         current_menu_selection = 0;
@@ -300,6 +320,19 @@ void maybeInitOptionsMenu(int nothing, int action){
     }
 }
 
+void maybeInitTestMenu(int nothing, int action){
+    //printf("Main menu highlighted\n");
+    if (action==1){
+        printf ("Action: init options menu\n");
+        initTestMenu();
+        return;
+    }
+    if (action==-1){
+        printf ("Cancelled going to options menu\n");
+        initMainMenu();
+    }
+}
+
 void maybeInitLanguageMenu(int nothing, int action){
     //printf("Language menu highlighted\n");
     if (action==1){
@@ -311,11 +344,11 @@ void maybeInitLanguageMenu(int nothing, int action){
 void initCharactersMenu(){
     initMenu(0);
     printf("Entering characters menu\n");
-    addMenuOptionWithFun (UI_CH_JUUL_NAME, setCharacter);
+    addMenuOptionWithFun (UI_CH_NISSE_NAME, setCharacter);
     addMenuOptionWithFun (UI_CH_GULLEROD_NAME, setCharacter);
     game_mode = CHARACTERS_MENU;
     if (amount_of_players==1){
-        player_2.character_id = CHARACTER_JUUL;
+        player_2.character_id = CHARACTER_NISSE;
         player_2.mesh.height = 150;
     }
     else if (amount_of_players==0){
@@ -326,7 +359,7 @@ void initCharactersMenu(){
 void setCharacter(int character, int action){
     player_1.character_id = character;
     player_1.mesh.height = 180;
-    if (character == CHARACTER_JUUL){
+    if (character == CHARACTER_NISSE){
         player_1.mesh.height = 150;
     }
     if (action==1){
@@ -349,26 +382,26 @@ void setPlayerFrame(int f, int player_id){
         player = &player_2;
     }
     
-    if (player->character_id==CHARACTER_JUUL){
+    if (player->character_id==CHARACTER_NISSE){
         if (f<=7){
             //////////// WIP
-            player->mesh.verts_x=juul_frames_x[f];
-            player->mesh.verts_y=juul_frames_y[f];
-            player->mesh.trirefs=juul_trirefs[f];
-            player->mesh.colrefs=juul_colrefs[f];
-            player->mesh.vert_count=juul_vert_counts[f];
-            player->mesh.tri_count=juul_tri_counts[f];
+            player->mesh.verts_x=nisse_frames_x[f];
+            player->mesh.verts_y=nisse_frames_y[f];
+            player->mesh.trirefs=nisse_trirefs[f];
+            player->mesh.colrefs=nisse_colrefs[f];
+            player->mesh.vert_count=nisse_vert_counts[f];
+            player->mesh.tri_count=nisse_tri_counts[f];
             return;
         }
         
         if ((f>=20)&&(f<20+FIFTH_OF_A_SECOND)){
-            player->mesh.verts_x = juul_verts_x_stille_0;
-            player->mesh.verts_y = juul_verts_y_stille_0;
-            player->mesh.trirefs = juul_trirefs_stille_0;
-            player->mesh.colrefs = juul_colrefs_stille_0;
+            player->mesh.verts_x = nisse_verts_x_stille_0;
+            player->mesh.verts_y = nisse_verts_y_stille_0;
+            player->mesh.trirefs = nisse_trirefs_stille_0;
+            player->mesh.colrefs = nisse_colrefs_stille_0;
             
-            player->mesh.vert_count = juul_vert_count_stille_0;
-            player->mesh.tri_count = juul_tri_count_stille_0;
+            player->mesh.vert_count = nisse_vert_count_stille_0;
+            player->mesh.tri_count = nisse_tri_count_stille_0;
             return;
         }
     }
@@ -426,6 +459,17 @@ void initDisplay(){
     next_prim = primBuff[0];
     
     loadFont();
+    
+    InitGeom();
+    gte_SetGeomOffset(SCREEN_WIDTH/2, SCREEN_HEIGHT/2); // middle of screen?
+    gte_SetGeomScreen(SCREEN_WIDTH/2); // distance to projection plane (controls FOV)
+    gte_SetBackColor (63, 63, 63); // ambient light?
+    MATRIX colour_matrix = {
+    ONE, 0, 0,
+    ONE, 0, 0,
+    ONE, 0, 0
+    };
+    gte_SetColorMatrix(&colour_matrix); // lights?
 }
 
 void swapBuffers() {
@@ -501,9 +545,9 @@ void drawPlayer(int playerNum){
     POLY_G3 *triangle=NULL;
     //int16_t player->pixel_x=player_1.pixel_x;
     // int16_t player->pixel_y=player_1.pixel_y;
-    uint8_t *player_red=juul_red;
-    uint8_t *player_green=juul_green;
-    uint8_t *player_blue=juul_blue;
+    uint8_t *player_red=nisse_red;
+    uint8_t *player_green=nisse_green;
+    uint8_t *player_blue=nisse_blue;
     if (player->character_id==CHARACTER_GULLEROD){
         player_red  = gullerod_red;
         player_green= gullerod_green;
@@ -519,9 +563,9 @@ void drawPlayer(int playerNum){
     if (playerNum==1){
         //player->pixel_x=player_2.pixel_x;
         // player->pixel_y=(176-64)*256*player_scale_y/256/16;
-        player_red=juul_2_red;
-        player_green=juul_2_green;
-        player_blue=juul_2_blue;
+        player_red=nisse_2_red;
+        player_green=nisse_2_green;
+        player_blue=nisse_2_blue;
         if (player->character_id==CHARACTER_GULLEROD){
             player_red  = gullerod_2_red;
             player_green= gullerod_2_green;
@@ -583,6 +627,149 @@ void drawPlayer(int playerNum){
         }
 }
 
+unsigned char cube_colours[18][3] = {
+    {0xff, 0x00, 0x00},
+    {0x00, 0xff, 0x00},
+    {0x00, 0x00, 0xff},
+    {0xff, 0xff, 0x00},
+    {0x00, 0xff, 0xff},
+    {0xff, 0x00, 0xff},
+    
+    {0xff, 0x80, 0x80},
+    {0x80, 0xff, 0x80},
+    {0x80, 0x80, 0xff},
+    {0xff, 0xff, 0x80},
+    {0x80, 0xff, 0xff},
+    {0xff, 0x80, 0xff},
+    
+    {0x80, 0x00, 0x00},
+    {0x00, 0x80, 0x00},
+    {0x00, 0x00, 0x80},
+    {0x80, 0x80, 0x00},
+    {0x00, 0x80, 0x80},
+    {0x80, 0x00, 0x80}
+};
+SVECTOR cube_positions[]={
+    // cube 1
+    {-256, -256+180, -256},
+    {-256, -256+180,  256},
+    { 256, -256+180,  256},
+    { 256, -256+180, -256},
+    {-256,  256+180, -256},
+    {-256,  256+180,  256},
+    { 256,  256+180,  256},
+    { 256,  256+180, -256},
+    // cube 2
+    {-200+500, -200+500, -200+500},
+    {-200+500, -200+500,  200+500},
+    { 200+500, -200+500,  200+500},
+    { 200+500, -200+500, -200+500},
+    {-200+500,  200+500, -200+500},
+    {-200+500,  200+500,  200+500},
+    { 200+500,  200+500,  200+500},
+    { 200+500,  200+500, -200+500},
+    // cube 3
+    {-200-500, -200+500, -200-500},
+    {-200-500, -200+500,  200-500},
+    { 200-500, -200+500,  200-500},
+    { 200-500, -200+500, -200-500},
+    {-200-500,  200+500, -200-500},
+    {-200-500,  200+500,  200-500},
+    { 200-500,  200+500,  200-500},
+    { 200-500,  200+500, -200-500}
+};
+size_t cube_indices[18][4]={
+    //cube 1
+    {0, 1, 3, 2},
+    {4, 7, 5, 6},
+    {0, 3, 4, 7},
+    {3, 2, 7, 6},
+    {2, 1, 6, 5},
+    {1, 0, 5, 4},
+    // cube 2
+    {0+8, 1+8, 3+8, 2+8},
+    {4+8, 7+8, 5+8, 6+8},
+    {0+8, 3+8, 4+8, 7+8},
+    {3+8, 2+8, 7+8, 6+8},
+    {2+8, 1+8, 6+8, 5+8},
+    {1+8, 0+8, 5+8, 4+8},
+    // cube 3
+    {0+16, 1+16, 3+16, 2+16},
+    {4+16, 7+16, 5+16, 6+16},
+    {0+16, 3+16, 4+16, 7+16},
+    {3+16, 2+16, 7+16, 6+16},
+    {2+16, 1+16, 6+16, 5+16},
+    {1+16, 0+16, 5+16, 4+16}
+};
+void draw3DTest(){
+    // account for non-square_pixels
+    VECTOR par; // pixel aspect ratio
+    setVector(&par, ONE*16/10, ONE, ONE ); // pixel aspect ratio is x
+    ScaleMatrixL(&scale_matrix, &par);
+    
+    //model_rotation.vx = -256;//current_frame & 0x511;
+    if (0&&current_frame & 512){
+        model_rotation.vx = 512 - (current_frame & 511);
+    }
+    model_rotation.vy = current_frame*8;
+    RotMatrix( &model_rotation, &test_matrix);
+    TransMatrix( &test_matrix, &model_position_in_world);
+    
+    MATRIX world_matrix;
+    world_rotation.vy--;
+    //world_position.vz--;
+    RotMatrix( &world_rotation, &world_matrix);
+    TransMatrix( &world_matrix, &world_position);
+    ScaleMatrixL(&world_matrix, &par); // Is this in the right place?
+    
+    gte_SetRotMatrix(&test_matrix);
+    gte_SetTransMatrix(&test_matrix);
+    
+    //ApplyMatrixLV(&world_matrix, &world_position, &world_position);
+    CompMatrixLV(&world_matrix, &test_matrix, &test_matrix);
+    PushMatrix();
+    
+    gte_SetRotMatrix(&test_matrix);
+    gte_SetTransMatrix(&test_matrix);
+    
+    int further;
+    int distance;
+    for (int face=0; face<18; face++){
+        //printf("%d", cube_indices[face][0]);
+        //cube_positions[cube_indices[face][0]];
+        //cube_positions[cube_indices[face][1]];
+        //cube_positions[cube_indices[face][2]];
+        //cube_indices[face][0];
+        gte_ldv3(&(cube_positions[cube_indices[face][0]]), 
+                 &(cube_positions[cube_indices[face][1]]),
+                 &(cube_positions[cube_indices[face][2]]));
+        POLY_F4* polygon = (POLY_F4*)next_prim;
+        gte_rtpt();
+        gte_nclip();
+        gte_stopz(&further);
+        if (further<0){
+            continue;
+        }
+        gte_avsz3();
+        gte_stotz(&distance);
+        if (distance<6){
+             continue;
+        }
+        
+        setPolyF4(polygon);
+        gte_stsxy0(&polygon->x0);
+        gte_stsxy1(&polygon->x1);
+        gte_stsxy2(&polygon->x2);
+        gte_ldv0(&cube_positions[cube_indices[face][3]]);
+        gte_rtps();
+        gte_stsxy( &polygon->x3 );
+        setRGB0(polygon, cube_colours[face][0], cube_colours[face][1], cube_colours[face][2]);
+        addPrim(orderingTables[currentBuffer]+(distance), polygon);
+        next_prim += sizeof(POLY_F4);
+    }
+    PopMatrix();
+}
+
 void resetGameState(){
     won_last_fight = 0;
     Player *player = &player_1;
@@ -600,7 +787,7 @@ void resetGameState(){
     player->ai.dodge = 0;
     player->ai.dodge_wait = 0;
     player->ai.attack_wait = 0;
-    // player->character_id = CHARACTER_JUUL;
+    // player->character_id = CHARACTER_NISSE;
     
     player = &player_2;
     }
@@ -1005,7 +1192,7 @@ void drawHealth(){
         setTile(tile);
         setXY0(tile, 10, 200);
         setWH(tile, player_1.health*(240/PLAYER_MAX_HEALTH), 20);
-        setRGB0(tile, juul_red[MAIN_COLOUR], juul_green[MAIN_COLOUR], juul_blue[MAIN_COLOUR]);
+        setRGB0(tile, nisse_red[MAIN_COLOUR], nisse_green[MAIN_COLOUR], nisse_blue[MAIN_COLOUR]);
         addPrim(orderingTables[currentBuffer], tile);
         next_prim += sizeof(TILE);
     }
@@ -1016,7 +1203,7 @@ void drawHealth(){
         setTile(tile);
         setXY0(tile, 10+256, 200);
         setWH(tile, player_2.health*(240/PLAYER_MAX_HEALTH), 20);
-        setRGB0(tile, juul_2_red[MAIN_COLOUR], juul_2_green[MAIN_COLOUR], juul_2_blue[MAIN_COLOUR]);
+        setRGB0(tile, nisse_2_red[MAIN_COLOUR], nisse_2_green[MAIN_COLOUR], nisse_2_blue[MAIN_COLOUR]);
         addPrim(orderingTables[currentBuffer], tile);
         next_prim += sizeof(TILE);
     }
@@ -1271,8 +1458,8 @@ int main() {
     uint16_t button_input_2 = 0;
     initLanguageMenu();
     resetGameState();
-    player_1.character_id = CHARACTER_JUUL;
-    player_2.character_id = CHARACTER_JUUL;
+    player_1.character_id = CHARACTER_NISSE;
+    player_2.character_id = CHARACTER_NISSE;
     player_1.mesh.height = 150;
     player_2.mesh.height = 150;
     while(1) {
@@ -1292,16 +1479,20 @@ int main() {
         
         
         if ((game_mode==LANGUAGE_MENU) || (game_mode==MAIN_MENU) ||
-            (game_mode==CHARACTERS_MENU)||(game_mode==OPTIONS_MENU) ){
+            (game_mode==CHARACTERS_MENU)||(game_mode==OPTIONS_MENU) ||
+            (game_mode==TEST_MENU) ){
             getMenuInput(button_input_1|button_input_2);
             drawMenu();
-            if (current_screen_time > FIFTH_OF_A_SECOND*5*20){
+            if ((current_screen_time > FIFTH_OF_A_SECOND*5*20) && (game_mode != TEST_MENU)){
                 resetGameState();
                 if (game_mode!=CHARACTERS_MENU){
                     amount_of_players = 0;
                     game_mode=FIGHT_MODE;
                 }
                 // maybe allow the game to return to the language menu if this goes on for a while
+            }
+            if (game_mode == TEST_MENU){
+                draw3DTest();
             }
         }
         else if (game_mode==SHOW_RESULT){
@@ -1342,10 +1533,12 @@ int main() {
         }
         button_filter=debounceInputs(button_input_1|button_input_2);
         
-        setPlayerFrame(player_1.frame, PLAYER_ONE_ID);
-        drawPlayer(0);
-        setPlayerFrame(player_2.frame, PLAYER_TWO_ID);
-        drawPlayer(1);
+        if (game_mode != TEST_MENU){
+            setPlayerFrame(player_1.frame, PLAYER_ONE_ID);
+            drawPlayer(0);
+            setPlayerFrame(player_2.frame, PLAYER_TWO_ID);
+            drawPlayer(1);
+        }
         
         if ((game_mode==FIGHT_MODE) || (game_mode==SHOW_RESULT)){
             drawHealth();
