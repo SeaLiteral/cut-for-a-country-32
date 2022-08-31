@@ -7,6 +7,8 @@
 # template directory for a makefile template.
 #
 # Modified by Lars Rune Præstmark to work with multi-target makefiles
+#  of the Klipperne engine
+# PSn00bSDK uses the MPL (Mozilla Public License)
 
 # NOTE: This file is meant to be one directory higher-up than the game itself.
 

@@ -1,6 +1,8 @@
 # Klipperne
 A homebrew game engine for the PS1, made using PSn00bSDK and a fighting game made using the engine. The name "Klipperne" can mean "the people who cut threads/hair/wool/paper" or "the rocks" (as in mountains).
 
+License: Apache
+
 ## Text rendering
 Text should be stored in the `interface.ini` file and will get converted into a binary file when building the game. Here's some code from the example file:
 ```
@@ -94,7 +96,9 @@ I'm aware that modern consoles are kinda PC-like in that games might need to hav
 The function `randomNumber` returns an unsigned 16-bit value. It uses a simple lagged Fibonacci generator, but that's still more random than most implementations of C's `rand` function. 
 
 # Cuts for a Country
-THe fighting game, 2D, with 2D graphics made of triangles. Mostly tested in DuckStation.
+The fighting game, 2D, with 2D graphics made of triangles. Mostly tested in DuckStation.
+
+License: Apache
 
 ## Controls
 Controls in game:
@@ -168,3 +172,4 @@ Timeline:
 - December 2021 for the 32bit Holiday Jam: simple combat, two players only
 - January 2022: menus, single player mode, introduced the carrot character, added demo/attract mode.
 - May 2022 during the 32bit Spring Cleaning Jam: simplified the animation tool, made some animations I didn't have time to actually make the game trigger, made the endscreen mention that it unlocks the carrot character, added a simple background "image" made of three rectangles, hiding the bright one when there's text in front of it because otherwise it could make the text hard to read.
+- August 2022: Added license (Apache) and initial 3D code.

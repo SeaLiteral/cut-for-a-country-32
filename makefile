@@ -12,6 +12,9 @@
 
 # Edit this to point to psn00bsdk-setup.mk, or copy that over to your project's
 # root folder (it only depends on environment variables).
+# PSn00bSDK uses the MPL (Mozilla Public License)
+
+
 include ../psn00bsdk-setup.mk
 
 # Project target name
